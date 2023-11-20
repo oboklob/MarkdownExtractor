@@ -1,0 +1,45 @@
+import pytest
+from unittest.mock import patch, MagicMock
+from markdownExtractor.image import download_and_extract_image_to_md, extract_image_md, _image_data_to_markdown, download_image, convert_svg_to_png, extract_image_text
+import tempfile
+
+@patch('TextExtractor.image.download_image')
+@patch('TextExtractor.image.extract_image_md')
+def test_download_and_extract_image_to_md_with_valid_image(mock_extract_image_md, mock_download_image):
+    mock_download_image.return_value = 'tests/resources/test.jpg'
+    mock_extract_image_md.return_value = 'markdown'
+    with tempfile.TemporaryDirectory() as tempDirectory:
+        result = download_and_extract_image_to_md('https://stu.co.uk/test.jpg', tempDirectory)
+    assert result == 'markdown'
+
+
+@patch('TextExtractor.image.extract_image_text')
+def test_extract_image_md_with_valid_image(mock_extract_image_text):
+    mock_extract_image_text.return_value = 'extracted_text'
+    result = extract_image_md( 'https://stu.co.uk/test.jpg', 'tests/resources/test.jpg')
+    assert result == '![](https://stu.co.uk/test.jpg "extracted_text")'
+
+def test_image_data_to_markdown_with_empty_alt_text_and_extracted_text():
+    result = _image_data_to_markdown('src', '', '', False)
+    assert result == ''
+
+@patch('TextExtractor.image.requests.get')
+def test_download_image_with_valid_url(mock_get):
+    mock_get.return_value.content = b'image_content'
+    result = download_image('https://upload.wikimedia.org/wikipedia/commons/3/3f/JPEG_example_flower.jpg', 'temp_directory')
+    assert result.endswith('.jpg')
+
+@patch('TextExtractor.image.cairosvg.svg2png')
+@patch('TextExtractor.image.Image.open')
+def test_convert_svg_to_png_with_valid_svg(mock_open, mock_svg2png):
+    mock_svg2png.return_value = b'png_data'
+    mock_open.return_value = 'image'
+    # get file from resources subdirectory of this package
+    result = convert_svg_to_png('tests/resources/line_box.svg')
+    assert result == 'image'
+
+@patch('TextExtractor.image.pytesseract.image_to_data')
+def test_extract_image_text_with_valid_image(mock_image_to_data):
+    mock_image_to_data.return_value = {'text': ['extracted', 'text'], 'conf': [100, 100]}
+    result = extract_image_text('tests/resources/test.jpg')
+    assert result == 'extracted text'

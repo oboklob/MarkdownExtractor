@@ -1,0 +1,4 @@
+tests/log/
+tests/log/*.log
+temp_directory/
+.idea/*

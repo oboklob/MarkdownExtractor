@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup, Comment
 from .image import download_and_extract_image_to_md
 import re
 import tempfile
+from urllib.parse import urljoin
 
 
 def tag_visible(element: BeautifulSoup) -> bool:

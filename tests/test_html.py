@@ -12,6 +12,12 @@ def test_md_from_html_with_valid_html(mock_soup):
     result = md_from_html('<p>Hello, World!</p>')
     assert result == 'Hello, World!'
 
+@patch('markdownExtractor.html.BeautifulSoup')
+def test_md_from_html_with_relative_links(mock_soup):
+    mock_soup.return_value = BeautifulSoup('<p>Hello, <a href="world.html">World!</a></p>', 'html.parser')
+    result = md_from_html('<p>Hello, <a href="world.html">World!</a></p>', url='http://example.com')
+    assert result == 'Hello,\n[World!](http://example.com/world.html)'
+
 
 def test_convert_links_to_markdown_with_valid_link():
     soup = BeautifulSoup('<a href="http://example.com">Example</a>', 'html.parser')

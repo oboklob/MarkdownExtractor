@@ -109,7 +109,7 @@ def extract(
                             enhance_image_level=enhance_image_level)
         if text:
             logging.debug(f"Got '{text[0:100]}...'")
-            return text.decode('utf-8')
+            return text
 
     elif filemime == 'application/pdf':
         # Convert to html then call extract
@@ -139,24 +139,6 @@ def extract(
 
     file_extension = os.path.splitext(filepath)[1]
 
-    if not _trying_again and text == '':
-        # try something specific to the filemime:
-        logging.debug(f'Using filemime: "{filemime}" as extension failed!')
-
-        if alt_ext != file_extension:
-            logging.debug(f'Using detected extension: "{alt_ext[1:]}"')
-            # also stripping the dot, mimetypes and splittext keep the . e.f. '.pdf'
-            #  but textract wants just 'pdf'
-            text = textract_wrapper(filepath, extension=alt_ext[1:], url=url, extract_images=extract_images,
-                                    strip_non_content=strip_non_content, enhance_images=enhance_image_level,
-                                    trying_again=True)
-
-    # Sometimes a file that needs teserract will come back with a few chars.
-    if len(text) < 10 and ((file_extension == '.pdf' and not _trying_again) or alt_ext == '.pdf'):
-        logging.debug(f"Trying tesseract for PDF...")
-        # try tesseract with english ocr
-        text = textract_wrapper(filepath, extension='pdf', method='tesseract', language='eng', trying_again=True)
-
     if len(text) < 10 and not _trying_again:
         # retry with common mimetypes in case it was incorrectly categorized
         tried = {file_extension, alt_ext}
@@ -173,7 +155,7 @@ def extract(
         logging.error(f"Everything failed!")
 
     logging.debug('extracted')
-    return text.decode('utf-8')
+    return text
 
 
 """

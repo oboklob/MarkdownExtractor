@@ -20,7 +20,7 @@ class TestmarkdownExtractor(unittest.TestCase):
 
     @patch('markdownExtractor.md_from_html')
     def test_extract_html(self, mock_md_from_html):
-        mock_md_from_html.return_value = b'Hello World'
+        mock_md_from_html.return_value = 'Hello World'
         result = extract('tests/resources/test.html', 'text/html')
         self.assertEqual(result, 'Hello World')
 

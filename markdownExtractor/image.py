@@ -244,7 +244,7 @@ def extract_image_text(local_path: str, enhance_level: int = 2) -> str:
     text = ''
 
     for i in range(len(data['text'])):
-        if int(data['conf'][i]) > 40:  # Confidence level check
+        if int(data['conf'][i]) > 60:  # Confidence level check
             text += data['text'][i] + ' '
 
     return text.strip()

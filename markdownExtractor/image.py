@@ -223,8 +223,11 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
                 # Image is in color (3D), so reverse color channels
                 open_cv_image = open_cv_image[:, :, ::-1].copy()
 
-            # Convert the image to grayscale
-            gray = cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2GRAY)
+            # Convert the image to grayscale only if it has 3 channels
+            if open_cv_image.shape[-1] == 3:
+                gray = cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = open_cv_image
             # cv2.imwrite("greyscale_image.png", gray)  # Save the blurred image
 
             # Apply Gaussian Blur

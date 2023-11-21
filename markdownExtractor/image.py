@@ -207,9 +207,13 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
         img = img.resize(new_size, Image.LANCZOS)
         # img.save("resized_image.png")  # Save the resized image
 
+        # Ensure the image is in the correct mode
+        if img.mode not in ('L', 'RGB', 'RGBA'):
+            img = img.convert('RGB')
+
         # Increase contrast
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.5)  # Adjust the factor to suit your needs
+        img = enhancer.enhance(1.5)
         # img.save("contrast_enhanced_image.png")  # Save the contrast-enhanced image
 
         if enhance_level > 1:
@@ -244,7 +248,7 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
     text = ''
 
     for i in range(len(data['text'])):
-        if int(data['conf'][i]) > 30:  # Confidence level check
+        if int(data['conf'][i]) > 40:  # Confidence level check
             text += data['text'][i] + ' '
 
     return text.strip()

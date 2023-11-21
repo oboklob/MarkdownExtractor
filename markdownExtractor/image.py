@@ -18,7 +18,7 @@ def download_and_extract_image_to_md(
         src: str,
         temp_directory: str,
         alt_text: str = '',
-        enhance_level: int = 2,
+        enhance_level: int = 0,
         include_empty=False) -> str:
     """
     Download an image, extract text and convert to markdown
@@ -45,7 +45,7 @@ def download_and_extract_image_to_md(
     return extract_image_md(src, local_path, alt_text, enhance_level=enhance_level, include_empty=include_empty)
 
 
-def extract_image_md(src: str, local_path: str, alt_text: str = '', enhance_level: int = 2, include_empty=False) -> str:
+def extract_image_md(src: str, local_path: str, alt_text: str = '', enhance_level: int = 1, include_empty=False) -> str:
     """
     Extract text from a local image and convert to markdown
     :param src:
@@ -183,7 +183,7 @@ def convert_svg_to_png(svg_path: str, output_width: int = 1000, output_height: i
     return Image.open(io.BytesIO(png_data))
 
 
-def extract_image_text(local_path: str, enhance_level: int = 2) -> str:
+def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
     """
     Extract raw text from an image via OCR
     :param local_path:
@@ -205,46 +205,46 @@ def extract_image_text(local_path: str, enhance_level: int = 2) -> str:
         scale_factor = 6
         new_size = (img.width * scale_factor, img.height * scale_factor)
         img = img.resize(new_size, Image.LANCZOS)
-
-        # Convert to grayscale
-        img = img.convert('L')
+        # img.save("resized_image.png")  # Save the resized image
 
         # Increase contrast
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(2.0)  # Adjust the factor to suit your needs
+        img = enhancer.enhance(1.5)  # Adjust the factor to suit your needs
+        # img.save("contrast_enhanced_image.png")  # Save the contrast-enhanced image
 
         if enhance_level > 1:
-            # Convert PIL Image to OpenCV format
             open_cv_image = np.array(img)
             # Convert RGB to BGR
             if len(open_cv_image.shape) == 3:
                 # Image is in color (3D), so reverse color channels
                 open_cv_image = open_cv_image[:, :, ::-1].copy()
 
-            # Apply Gaussian Blur
-            blur = cv2.GaussianBlur(open_cv_image, (5, 5), 0)
+            # Convert the image to grayscale
+            gray = cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2GRAY)
+            # cv2.imwrite("greyscale_image.png", gray)  # Save the blurred image
 
-            # Apply Adaptive Thresholding
-            thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            # Apply Gaussian Blur
+            blur = cv2.GaussianBlur(gray, (3, 3), 0)
+            # cv2.imwrite("blurred_image.png", blur)  # Save the blurred image
+
+            # Apply Global Thresholding
+            _, thresh = cv2.threshold(blur, 127, 255, cv2.THRESH_BINARY)
+            # cv2.imwrite("thresholded_image.png", thresh)  # Save the thresholded image
 
             # Convert back to PIL Image
-            img = Image.fromarray(cv2.cvtColor(thresh, cv2.COLOR_BGR2RGB))
-        # Apply thresholding
-        # Convert the image to grayscale
-        img = img.convert('L')
+            img = Image.fromarray(thresh)
 
-        threshold = 155
-        img = img.point(lambda x: 0 if x < threshold else 255, '1')
+        else:
+            # Convert to grayscale
+            img = img.convert('L')
 
-        # Optional: Apply noise reduction (using ImageFilter or OpenCV)
-        img = img.filter(ImageFilter.MedianFilter())
-
+    custom_config = r'--oem 3 --psm 4'
     # Perform OCR
-    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT, config=custom_config)
     text = ''
 
     for i in range(len(data['text'])):
-        if int(data['conf'][i]) > 60:  # Confidence level check
+        if int(data['conf'][i]) > 30:  # Confidence level check
             text += data['text'][i] + ' '
 
     return text.strip()

@@ -83,7 +83,7 @@ def extract(
         url: str = None,
         extract_images: bool = True,
         strip_non_content: bool = True,
-        enhance_image_level: int = 2
+        enhance_image_level: int = 1
 ) -> str:
     """
 

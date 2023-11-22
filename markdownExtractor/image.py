@@ -2,7 +2,7 @@ import base64
 import hashlib
 import cairosvg
 import cv2
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
 import numpy as np
 import os
 import io

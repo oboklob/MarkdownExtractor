@@ -31,6 +31,12 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
     """
     soup = BeautifulSoup(body, 'html.parser')
     logging.debug(f"Converting HTML to Markdown...")
+
+    # strip headers/footers/navigation etc
+    if strip_non_content:
+        soup = strip_decoration(soup)
+        logging.debug(f"stripped decoration...")
+
     # convert relative links to absolute using the base_url if we have one
     if url:
         for link in soup.findAll('a', href=True):
@@ -40,10 +46,6 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
 
     logging.debug(f"converted relative links to absolute...")
 
-    # strip headers/footers/navigation etc
-    if strip_non_content:
-        soup = strip_decoration(soup)
-        logging.debug(f"stripped decoration...")
 
     # Annotate hyperlinks with their href attribute
     convert_links_to_markdown(soup)
@@ -147,7 +149,13 @@ def strip_decoration(soup: BeautifulSoup) -> BeautifulSoup:
 
     # Find all elements where either the class or the id matches the unwanted pattern
     elements_to_decompose = []
-    for element in soup.find_all(True, {'class': unwanted_pattern, 'id': unwanted_pattern}):
+
+    targets = soup.find_all(True, {'class': unwanted_pattern})
+
+    targets += soup.find_all(True, {'id': unwanted_pattern})
+
+    for element in targets:
+        # logging.debug(f"Found unwanted element: {element}")
         # If the element has a class or id that matches the keep pattern, skip it
         if 'class' in element.attrs and any(keep_pattern.search(cls) for cls in element['class']):
             continue

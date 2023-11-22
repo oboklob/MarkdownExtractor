@@ -18,6 +18,185 @@ def test_md_from_html_with_relative_links(mock_soup):
     result = md_from_html('<p>Hello, <a href="world.html">World!</a></p>', url='http://example.com')
     assert result == 'Hello,\n[World!](http://example.com/world.html)'
 
+def test_md_from_html_with_large_navigation():
+    result = md_from_html("""<div class="wd_mobile-nav-wrapper">
+    						<div class="wd_open-nav"><a>ESG A to Z</a></div>
+    						<ul class="wd_mobile-nav">
+    	<li class=""><a href="/welcome">ACME's Better Days Home</a></li>
+
+    <li class="wd_has-children">
+    	<a href="/about-us" target="_self">
+    		About Us	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/kellogg-company-overview" target="_self" class="">ACME Company Overview</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/message-from-our-ceo" target="_self" class="">Message from our CEO</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/message-from-our-senior-vice-president" target="_self" class="">Message from the Sr. VP, Chief Global Corporate Affairs Officer</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/esg-oversight-and-management" target="_self" class="">ESG Oversight &amp; Management</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/wkkellogg-foundation" target="_self" class="">Relationship to W.K. ACME Foundation</a>
+    </li>
+    </ul>
+    </li>
+    <li class="wd_has-children">
+    	<a href="/wellbeing" target="_self">
+    		Wellbeing	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/our-approach-to-wellbeing" target="_self" class="">Our Approach to Wellbeing</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/responsible-marketing" target="_self" class="">Responsible Marketing</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/childhood-wellbeing-promise" target="_self" class="">Childhood Wellbeing Promise</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/food-safety" target="_self" class="">Food Safety</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/our-culinary-culture" target="_self" class="">Our Culinary Culture</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/healthier-lifestyles" target="_self" class="">Healthier Lifestyles</a>
+    </li>
+    </ul>
+    </li>
+    <li class="wd_has-children">
+    	<a href="/hunger" target="_self">
+    		Hunger	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/food-bank-partnerships" target="_self" class="">Food Bank Partnerships/Food Drives</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/child-feeding-programs" target="_self" class="">Child Feeding Programs</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/summer-hunger-programs" target="_self" class="">Summer Hunger Programs</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/disaster-relief" target="_self" class="">Disaster Relief</a>
+    </li>
+    </ul>
+    </li>
+    <li class="wd_has-children">
+    	<a href="/sustainability" target="_self">
+    		Sustainability	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/climate-action" target="_self" class="">Climate Action</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/renewable-electricity" target="_self" class="">Renewable Electricity</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/responsible-sourcing" target="_self" class="">Responsible Sourcing</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/sustainable-packaging" target="_self" class="">Sustainable Packaging</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/food-waste-reduction" target="_self" class="">Food Waste Reduction</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/water-efficiency" target="_self" class="">Water Efficiency</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/palm-oil" target="_self" class="">Palm Oil</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/deforestation" target="_self" class="">Deforestation</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/biodiversity" target="_self" class="">Biodiversity</a>
+    </li>
+    </ul>
+    </li>
+    <li class="wd_has-children">
+    	<a href="/equity-diversity-inclusion" target="_self">
+    		ED&amp;I	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/our-approach-to-edi" target="_self" class="">Our Approach to ED&amp;I</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/workforce" target="_self" class="">Workforce</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/business-employee-resource-groups" target="_self" class="">Business Employee Resource Groups</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/marketplace" target="_self" class="">Marketplace </a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/supplier-diversity" target="_self" class="">Supplier Diversity</a>
+    </li>
+    </ul>
+    </li>
+    <li class="wd_has-children">
+    	<a href="/people" target="_self">
+    		People	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/volunteerism" target="_self" class="">Volunteerism</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/supporting-our-hometown" target="_self" class="">Supporting Our Hometown</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/partnering-with-others" target="_self" class="">Partnering With Others</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/operating-ethically" target="_self" class="">Operating Ethically</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/human-rights" target="_self" class="">Human Rights</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/employee-safety" target="_self" class="">Employee Safety</a>
+    </li>
+    </ul>
+    </li>
+    <li class="wd_has-children active">
+    	<a href="/reporting" target="_self">
+    		Reporting	</a><span class="wd_indicator"></span>	<ul class="wd_mobile-submenu">
+    <li class="wd_submenu-item">
+    	<a href="/current-progress" target="_self" class="">Current Progress</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/materiality-united-nations-sustainable-development-goals" target="_self" class="">Materiality/U.N. SDGs</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/esg-a-to-z" target="_self" class="active">ESG A to Z</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/sasb" target="_self" class="">SASB</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/gri" target="_self" class="">GRI</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/tcfd" target="_self" class="">TCFD</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/cdp" target="_self" class="">CDP</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/stakeholder-engagement" target="_self" class="">Stakeholder Engagement</a>
+    </li>
+    <li class="wd_submenu-item">
+    	<a href="/archives" target="_self" class="">Archives</a>
+    </li>
+    </ul>
+    </li>
+    </ul>
+
+    					</div><p>Hello, <a href="world.html">World!</a></p>""", url='http://example.com')
+    assert result == 'Hello,\n[World!](http://example.com/world.html)'
+
+
 
 def test_convert_links_to_markdown_with_valid_link():
     soup = BeautifulSoup('<a href="http://example.com">Example</a>', 'html.parser')

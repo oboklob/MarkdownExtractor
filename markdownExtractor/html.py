@@ -4,6 +4,7 @@ from .image import download_and_extract_image_to_md
 import re
 import tempfile
 from urllib.parse import urljoin
+import copy
 
 
 def tag_visible(element: BeautifulSoup) -> bool:
@@ -45,7 +46,6 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
             img['src'] = urljoin(url, img['src'])
 
     logging.debug(f"converted relative links to absolute...")
-
 
     # Annotate hyperlinks with their href attribute
     convert_links_to_markdown(soup)
@@ -137,16 +137,37 @@ def convert_lists_to_markdown(soup: BeautifulSoup) -> None:
         list_tag.unwrap()
 
 
-def strip_decoration(soup: BeautifulSoup) -> BeautifulSoup:
+def strip_decoration(original_soup: BeautifulSoup) -> BeautifulSoup:
     """
     Given a BeautifulSoup object, attempt to remove all elements that are not part of the main content
-    :param soup:
+    :param original_soup:
     :return:
     """
+
+    # Remove semantic elements, if they don't contain main content indicators
+    for tag_name in ['header', 'footer', 'nav', 'aside', 'form']:
+        for element in original_soup.find_all(tag_name):
+            element.decompose()
+    # work on a copy of the soup so that we don't modify the original yet
+    # using python's copy module to avoid the "A copy of a bs4.element.Tag is not supported" error
+    soup = copy.copy(original_soup)
     # Compile regular expression patterns
-    unwanted_pattern = re.compile(r'(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie)', re.IGNORECASE)
+    unwanted_pattern = re.compile(r'(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie|social|share)', re.IGNORECASE)
     keep_pattern = re.compile(r'content', re.IGNORECASE)  # Pattern to identify main content
 
+    if not _try_decomposing_elements(soup, unwanted_pattern, keep_pattern):
+        soup = copy.copy(original_soup)
+        # try again with less aggressive pattern
+        unwanted_pattern = re.compile(r'(^nav|popup|menu|footer|header|sidebar|advert|modal|cookie|social|share)',
+                                      re.IGNORECASE)
+        if not _try_decomposing_elements(soup, unwanted_pattern, keep_pattern):
+            # don't do anything if we didn't find any content
+            return original_soup
+
+    return soup
+
+
+def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern, keep_pattern: re.Pattern) -> bool:
     # Find all elements where either the class or the id matches the unwanted pattern
     elements_to_decompose = []
 
@@ -161,20 +182,17 @@ def strip_decoration(soup: BeautifulSoup) -> BeautifulSoup:
             continue
         if 'id' in element.attrs and keep_pattern.search(element['id']):
             continue
+        if element.name == 'body':
+            continue
+
         elements_to_decompose.append(element)
 
     # Decompose collected elements
     for element in elements_to_decompose:
         element.decompose()
 
-    # Remove semantic elements, if they don't contain main content indicators
-    for tag_name in ['header', 'footer', 'nav', 'aside', 'form']:
-        for element in soup.find_all(tag_name):
-            if 'class' in element.attrs and any(keep_pattern.search(cls) for cls in element['class']):
-                continue
-            element.decompose()
-
-    return soup
+    # return true if there is any text content left
+    return len(soup.get_text(strip=True)) > 0
 
 
 def convert_images_to_text(soup: BeautifulSoup, enhance_level=2):

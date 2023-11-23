@@ -236,3 +236,19 @@ def test_convert_images_to_text_with_valid_image(mock_download_and_extract_image
     texts = soup.findAll(string=True)
     stripped = u"\n".join(t.strip() for t in texts)
     assert stripped == 'Image Text'
+
+
+@patch('markdownExtractor.html.BeautifulSoup')
+def test_md_from_html_with_possible_full_removal(mock_soup):
+    mock_soup.return_value = BeautifulSoup('<html><body class="clear-nav"><p>Hello, <a href="world.html">World!</a></p></body></html>', 'html.parser')
+    result = md_from_html('<html><body class="clear-nav"><p>Hello, <a href="world.html">World!</a></p></body></html>', url='http://example.com')
+    assert result == 'Hello,\n[World!](http://example.com/world.html)'
+
+@patch('markdownExtractor.html.BeautifulSoup')
+def test_md_from_html_with_less_agressive_strip_needed(mock_soup):
+    mock_soup.return_value = BeautifulSoup(
+        '<html><body class="clear-nav"><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></body></html>', 'html.parser')
+    result = md_from_html(
+        '<html><body class="clear-nav"><ul class="nav"><li>This is a nav item</li></ul><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></body></html>',
+        url='http://example.com')
+    assert result == 'Hello,\n[World!](http://example.com/world.html)'

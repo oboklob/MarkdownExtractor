@@ -177,8 +177,9 @@ def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern,
 
     for element in targets:
         # logging.debug(f"Found unwanted element: {element}")
+
         # If the element has a class or id that matches the keep pattern, skip it
-        if 'class' in element.attrs and any(keep_pattern.search(cls) for cls in element['class']):
+        if 'class' in element.attrs and element['class'] and any(keep_pattern.search(cls) for cls in element['class']):
             continue
         if 'id' in element.attrs and keep_pattern.search(element['id']):
             continue

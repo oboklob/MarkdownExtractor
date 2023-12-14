@@ -6,7 +6,7 @@ with open('requirements.txt', 'r') as f:
 
 setup(
     name='Markdown Extract',
-    version='0.1.2b',
+    version='0.1.3b',
     url='https://bitbucket.org/nameless-media/markdown-extract',
     author='Stuart Gallemore',
     author_email='stuart@tiscreport.org',

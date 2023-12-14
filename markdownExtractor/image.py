@@ -155,7 +155,11 @@ def download_image(src: str, temp_directory: str) -> str:
             return ''
 
         # Generate a file name based on the URL's hash
-        file_name = hashlib.md5(src.encode()).hexdigest() + '.' + src.split('.')[-1].split('?')[0]
+        extension = os.path.basename(src).split('.')[-1].split('?')[0]
+        if not extension:
+            extension = 'img'
+
+        file_name = hashlib.md5(src.encode()).hexdigest() + '.' + extension
         local_path = os.path.join(temp_directory, 'images', file_name)
         logging.debug(f" ======  Saving image to: {local_path}")
         Path(local_path).parent.mkdir(parents=True, exist_ok=True)

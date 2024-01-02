@@ -145,12 +145,20 @@ def strip_decoration(original_soup: BeautifulSoup) -> BeautifulSoup:
     """
 
     # Remove semantic elements, if they don't contain main content indicators
-    for tag_name in ['header', 'footer', 'nav', 'aside', 'form']:
+    for tag_name in ['header', 'footer', 'nav', 'aside']:
         for element in original_soup.find_all(tag_name):
             element.decompose()
     # work on a copy of the soup so that we don't modify the original yet
     # using python's copy module to avoid the "A copy of a bs4.element.Tag is not supported" error
     soup = copy.copy(original_soup)
+
+    for element in soup.find_all('form'):
+        element.decompose()
+
+    if not len(soup.get_text(strip=True)):
+        # un-decompose the forms and try again
+        soup = copy.copy(original_soup)
+
     # Compile regular expression patterns
     unwanted_pattern = re.compile(r'(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie|social|share)', re.IGNORECASE)
     keep_pattern = re.compile(r'content', re.IGNORECASE)  # Pattern to identify main content

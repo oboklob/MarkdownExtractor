@@ -161,7 +161,7 @@ def strip_decoration(original_soup: BeautifulSoup) -> BeautifulSoup:
 
     # Compile regular expression patterns
     unwanted_pattern = re.compile(r'(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie|social|share)', re.IGNORECASE)
-    keep_pattern = re.compile(r'content', re.IGNORECASE)  # Pattern to identify main content
+    keep_pattern = re.compile(r'(content|page)', re.IGNORECASE)  # Pattern to identify main content
 
     if not _try_decomposing_elements(soup, unwanted_pattern, keep_pattern):
         soup = copy.copy(original_soup)

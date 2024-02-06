@@ -208,7 +208,11 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
         # Resize the image
         scale_factor = 6
         new_size = (img.width * scale_factor, img.height * scale_factor)
-        img = img.resize(new_size, Image.LANCZOS)
+        try:
+            img = img.resize(new_size, Image.LANCZOS)
+        except OSError:
+            logging.error(f"Failed to resize image: {local_path}")
+            return ''
         # img.save("resized_image.png")  # Save the resized image
 
         # Ensure the image is in the correct mode

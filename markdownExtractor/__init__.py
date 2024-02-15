@@ -43,7 +43,9 @@ def extract_from_url(url: str, extract_images: bool = True, strip_non_content: b
         # try filemime from the headers
         filemime = r.headers.get('content-type')
 
-        open(filepath, 'wb').write(r.content)
+        with open(filepath, 'wb') as file:
+            file.write(r.content)
+
         logging.debug(f"Downloaded file to: {filepath}")
 
         # extract the text from the file

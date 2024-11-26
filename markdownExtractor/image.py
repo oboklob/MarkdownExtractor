@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 import logging
 
+logger = logging.getLogger(__name__)
 
 def download_and_extract_image_to_md(
         src: str,
@@ -29,18 +30,18 @@ def download_and_extract_image_to_md(
     :param include_empty:
     :return:
     """
-    logging.debug(f"Downloading image: {src}")
+    logger.debug(f"Downloading image: {src}")
     local_path = download_image(src, temp_directory)
-    logging.debug(f"Downloaded image to: {local_path}")
+    logger.debug(f"Downloaded image to: {local_path}")
     if not local_path:
-        logging.error(src + ' failed to download')
+        logger.error(src + ' failed to download')
         return ''
 
     if not os.path.isfile(local_path):
-        logging.error(f"File not found: {local_path}")
+        logger.error(f"File not found: {local_path}")
         return ''
 
-    logging.debug(f"Downloaded image to: {local_path}")
+    logger.debug(f"Downloaded image to: {local_path}")
 
     return extract_image_md(src, local_path, alt_text, enhance_level=enhance_level, include_empty=include_empty)
 
@@ -100,7 +101,7 @@ def _image_data_to_markdown(src, alt_text, extracted_text, include_empty=False) 
         else:
             text_content += ')'
 
-    logging.debug(f"Extracted text: {text_content}")
+    logger.debug(f"Extracted text: {text_content}")
 
     return text_content
 
@@ -121,7 +122,7 @@ def download_image(src: str, temp_directory: str) -> str:
     match = data_url_pattern.match(src)
 
     if match:
-        logging.debug(f"Found data URL: {src}")
+        logger.debug(f"Found data URL: {src}")
         # It's a data URL, so decode the base64 data
         image_data = base64.b64decode(match.group('data'))
         image_type = match.group('type')
@@ -146,12 +147,12 @@ def download_image(src: str, temp_directory: str) -> str:
         return local_path
     elif src.startswith(('http://', 'https://')):
         try:
-            logging.debug(f"Downloading image: {src}")
+            logger.debug(f"Downloading image: {src}")
             response = requests.get(src, headers=headers, timeout=2)
             response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful
             # status code
         except requests.exceptions.RequestException as e:
-            logging.warning(f"Failed to retrieve image: {src}, due to: {e}")
+            logger.warning(f"Failed to retrieve image: {src}, due to: {e}")
             return ''
 
         # Generate a file name based on the URL's hash
@@ -161,17 +162,17 @@ def download_image(src: str, temp_directory: str) -> str:
 
         file_name = hashlib.md5(src.encode()).hexdigest() + '.' + extension
         local_path = os.path.join(temp_directory, 'images', file_name)
-        logging.debug(f" ======  Saving image to: {local_path}")
+        logger.debug(f" ======  Saving image to: {local_path}")
         Path(local_path).parent.mkdir(parents=True, exist_ok=True)
 
         with open(local_path, 'wb') as file:
-            logging.debug(f"Writing image to: {local_path}")
+            logger.debug(f"Writing image to: {local_path}")
             file.write(response.content)  # Write the entire content at once
 
         return local_path
 
     else:
-        logging.warning(f"Could not download image: {src} - no idea what protocol that IS!")
+        logger.warning(f"Could not download image: {src} - no idea what protocol that IS!")
         return ''
 
 
@@ -201,7 +202,7 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
             try:
                 img = Image.open(io.BytesIO(file.read()))
             except UnidentifiedImageError:
-                logging.error(f"Failed to open image: {local_path}")
+                logger.error(f"Failed to open image: {local_path}")
                 return ''
 
     if enhance_level > 0:
@@ -211,7 +212,7 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
         try:
             img = img.resize(new_size, Image.LANCZOS)
         except OSError:
-            logging.error(f"Failed to resize image: {local_path}")
+            logger.error(f"Failed to resize image: {local_path}")
             return ''
         # img.save("resized_image.png")  # Save the resized image
 

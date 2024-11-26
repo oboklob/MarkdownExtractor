@@ -22,6 +22,7 @@ from .html import md_from_html
 from .image import extract_image_md, download_image
 from .powerpoint import extract_pptx_md
 
+logger = logging.getLogger(__name__)
 
 def extract_from_url(url: str, extract_images: bool = True, strip_non_content: bool = True,
                      enhance_images: bool = True) -> str:
@@ -37,7 +38,7 @@ def extract_from_url(url: str, extract_images: bool = True, strip_non_content: b
     # download the file to a tempfile directory
     with tempfile.TemporaryDirectory() as tempDirectory:
         filepath = os.path.join(tempDirectory, 'file')
-        logging.debug(f"Downloading file to: {filepath}")
+        logger.debug(f"Downloading file to: {filepath}")
         r = requests.get(url, allow_redirects=True, timeout=2)
 
         # try filemime from the headers
@@ -46,7 +47,7 @@ def extract_from_url(url: str, extract_images: bool = True, strip_non_content: b
         with open(filepath, 'wb') as file:
             file.write(r.content)
 
-        logging.debug(f"Downloaded file to: {filepath}")
+        logger.debug(f"Downloaded file to: {filepath}")
 
         # extract the text from the file
         text = extract(filepath, filemime=filemime, extract_images=extract_images, strip_non_content=strip_non_content,
@@ -107,20 +108,20 @@ def extract(
         filemime = get_filemime(filepath)
 
     if not filemime:
-        logging.error(f"Could not determine mimetype for {filepath}")
+        logger.error(f"Could not determine mimetype for {filepath}")
         return ''
 
     file_content = get_file_content(filepath, filemime)
 
     if filemime == 'text/html':
-        logging.debug(f"Converting HTML to Markdown...")
+        logger.debug(f"Converting HTML to Markdown...")
         text = md_from_html(file_content, url=url, extract_images=extract_images, strip_non_content=strip_non_content,
                             enhance_image_level=enhance_image_level)
         if text:
-            logging.debug(f"Got '{text[0:100]}...'")
+            logger.debug(f"Got '{text[0:100]}...'")
             return text
         else:
-            logging.debug(f"Got nothing from HTML!")
+            logger.debug(f"Got nothing from HTML!")
 
     elif filemime == 'application/pdf':
         # Convert to html then call extract
@@ -145,7 +146,7 @@ def extract(
         return extract_pptx_md(filepath)
     else:
         # raise an error if we don't know how to handle this file type
-        logging.error(f"Unsupported mimetype: {filemime}")
+        logger.error(f"Unsupported mimetype: {filemime}")
         return ''
 
         # Don't trust the user to give us a valid mimetype, or file extension - so try until we get something
@@ -155,15 +156,15 @@ def extract(
         # retry with common mimetypes in case it was incorrectly categorized
         alt_mimetype = get_filemime(filepath)
         if alt_mimetype != filemime:
-            logging.debug(f"Trying alternative mimetype: {alt_mimetype}")
+            logger.debug(f"Trying alternative mimetype: {alt_mimetype}")
             text = extract(filepath, filemime=alt_mimetype, extract_images=extract_images,
                            strip_non_content=strip_non_content, enhance_image_level=enhance_image_level,
                            _trying_again=True)
 
         if not text:
-            logging.error(f"Everything failed!")
+            logger.error(f"Everything failed!")
 
-    logging.debug('extracted')
+    logger.debug('extracted')
     return text
 
 

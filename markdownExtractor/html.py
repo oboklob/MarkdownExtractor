@@ -6,6 +6,7 @@ import tempfile
 from urllib.parse import urljoin
 import copy
 
+logger = logging.getLogger(__name__)
 
 def tag_visible(element: BeautifulSoup) -> bool:
     """
@@ -31,12 +32,12 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
     :param strip_non_content:
     """
     soup = BeautifulSoup(body, 'html.parser')
-    logging.debug(f"Converting HTML to Markdown...")
+    logger.debug(f"Converting HTML to Markdown...")
 
     # strip headers/footers/navigation etc
     if strip_non_content:
         soup = strip_decoration(soup)
-        logging.debug(f"stripped decoration...")
+        logger.debug(f"stripped decoration...")
 
     # convert relative links to absolute using the base_url if we have one
     if url:
@@ -45,22 +46,22 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
         for img in soup.findAll('img', src=True):
             img['src'] = urljoin(url, img['src'])
 
-    logging.debug(f"converted relative links to absolute...")
+    logger.debug(f"converted relative links to absolute...")
 
     # Annotate hyperlinks with their href attribute
     convert_links_to_markdown(soup)
-    logging.debug(f"converted links to markdown...")
+    logger.debug(f"converted links to markdown...")
     convert_headings_to_markdown(soup)
-    logging.debug(f"converted headings to markdown...")
+    logger.debug(f"converted headings to markdown...")
     convert_emphasis_to_markdown(soup)
-    logging.debug(f"converted emphasis to markdown...")
+    logger.debug(f"converted emphasis to markdown...")
     convert_lists_to_markdown(soup)
-    logging.debug(f"converted lists to markdown...")
+    logger.debug(f"converted lists to markdown...")
 
     # extract text from any embedded images
     if extract_images:
         convert_images_to_text(soup, enhance_level=enhance_image_level)
-        logging.debug(f"converted images to text...")
+        logger.debug(f"converted images to text...")
 
     texts = soup.findAll(string=True)
     visible_texts = filter(tag_visible, texts)
@@ -70,7 +71,7 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
     stripped = re.sub(r'\n{3,}', '\n\n', stripped)
     stripped = re.sub(r' {3,}', '  ', stripped)
 
-    return stripped
+    return stripped.strip()
 
 
 def convert_links_to_markdown(soup: BeautifulSoup) -> None:
@@ -176,6 +177,8 @@ def strip_decoration(original_soup: BeautifulSoup) -> BeautifulSoup:
 
 
 def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern, keep_pattern: re.Pattern) -> bool:
+
+    # TODO: problem items https://tiscreport.org/statement-processing/MSAStatement/587686
     # Find all elements where either the class or the id matches the unwanted pattern
     elements_to_decompose = []
 
@@ -184,7 +187,7 @@ def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern,
     targets += soup.find_all(True, {'id': unwanted_pattern})
 
     for element in targets:
-        # logging.debug(f"Found unwanted element: {element}")
+        # logger.debug(f"Found unwanted element: {element}")
 
         # If the element has a class or id that matches the keep pattern, skip it
         if 'class' in element.attrs and element['class'] and any(keep_pattern.search(cls) for cls in element['class']):
@@ -193,6 +196,8 @@ def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern,
             continue
         if element.name == 'body':
             continue
+
+        logger.debug(f"Decomposing unwanted element: {element}")
 
         elements_to_decompose.append(element)
 

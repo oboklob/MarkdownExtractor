@@ -161,52 +161,67 @@ def strip_decoration(original_soup: BeautifulSoup) -> BeautifulSoup:
         soup = copy.copy(original_soup)
 
     # Compile regular expression patterns
-    unwanted_pattern = re.compile(r'(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie|social|share)', re.IGNORECASE)
-    keep_pattern = re.compile(r'(content|page|wrapper)', re.IGNORECASE)  # Pattern to identify main content
+    unwanted_class_id_pattern = re.compile(
+        r'(?<![\w-])(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie|social|share|navigation|dialog|banner|menubar|menuitem)(?![\w-])')
 
-    if not _try_decomposing_elements(soup, unwanted_pattern, keep_pattern):
-        soup = copy.copy(original_soup)
-        # try again with less aggressive pattern
-        unwanted_pattern = re.compile(r'(^nav|popup|menu|footer|header|sidebar|advert|modal|cookie|social|share)',
-                                      re.IGNORECASE)
-        if not _try_decomposing_elements(soup, unwanted_pattern, keep_pattern):
-            # don't do anything if we didn't find any content
-            return original_soup
+    keep_class_id_pattern = re.compile(r'(content|page|wrapper|main)', re.IGNORECASE)  # Pattern to identify main content
+
+    soup = _try_decomposing_elements(soup, unwanted_class_id_pattern, keep_class_id_pattern, ['class', 'id', 'role'])
+
+    # harsher decomposing on unordered lists:
+
+    unwanted_ul_class_pattern = re.compile(r'(nav|menu|menubar|menuitem)')
+
+    soup = _try_decomposing_elements(soup, unwanted_ul_class_pattern, None, ['class'], ['li', 'ul'])
 
     return soup
 
 
-def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern, keep_pattern: re.Pattern) -> bool:
+def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern, keep_pattern: re.Pattern | None, attr: list = None, elements: list = None) -> BeautifulSoup:
 
     # TODO: problem items https://tiscreport.org/statement-processing/MSAStatement/587686
     # Find all elements where either the class or the id matches the unwanted pattern
     elements_to_decompose = []
 
-    targets = soup.find_all(True, {'class': unwanted_pattern})
+    if attr is None:
+        attr = ['class', 'id']
 
-    targets += soup.find_all(True, {'id': unwanted_pattern})
+    if elements is None:
+        # run it once for All elements
+        elements = [True]
+
+    targets = []
+    for a in attr:
+        for element in elements:
+            targets += soup.find_all(element, {a: unwanted_pattern})
 
     for element in targets:
         # logger.debug(f"Found unwanted element: {element}")
+        keep = False
+        if keep_pattern is not None:
+            for a in attr:
+                if a in element.attrs and any(keep_pattern.search(cls) for cls in element[a]):
+                    keep = True
 
-        # If the element has a class or id that matches the keep pattern, skip it
-        if 'class' in element.attrs and element['class'] and any(keep_pattern.search(cls) for cls in element['class']):
+        if keep or element.name == 'body':
+            # don't remove if it's a keeper or the body tag
             continue
-        if 'id' in element.attrs and keep_pattern.search(element['id']):
-            continue
-        if element.name == 'body':
-            continue
-
-        logger.debug(f"Decomposing unwanted element: {element}")
 
         elements_to_decompose.append(element)
 
     # Decompose collected elements
     for element in elements_to_decompose:
-        element.decompose()
+        backup_soup = copy.copy(soup)
+        if element.name is not None:
+            logger.debug(f"Decomposing: {element.name} {element.attrs}")
+            element.decompose()
+            if len(soup.get_text(strip=True)) == 0:
+                # restore the soup because stripping this element removed all content
+                logger.debug(f"Restoring soup because stripping {element} removed all content")
+                soup = backup_soup
 
-    # return true if there is any text content left
-    return len(soup.get_text(strip=True)) > 0
+    logger.debug(f"Decomposed to:\n{soup.get_text()}")
+    return soup
 
 
 def convert_images_to_text(soup: BeautifulSoup, enhance_level=2):

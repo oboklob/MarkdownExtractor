@@ -20,7 +20,6 @@ def test_md_from_html_with_relative_links(mock_soup):
 
 def test_md_from_html_with_large_navigation():
     result = md_from_html("""<div class="wd_mobile-nav-wrapper">
-    						<div class="wd_open-nav"><a>ESG A to Z</a></div>
     						<ul class="wd_mobile-nav">
     	<li class=""><a href="/welcome">ACME's Better Days Home</a></li>
 

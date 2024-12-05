@@ -60,8 +60,8 @@ class TestmarkdownExtractor(unittest.TestCase):
         result = extract('tests/resources/test.pdf', 'application/pdf')
         self.assertTrue('Test Document' in result)
 
-    def test_extract_actual_pdf(self):
-        result = extract('tests/resources/scanned.pdf', 'application/pdf')
+    def test_extract_actual_pdf_2(self):
+        result = extract('tests/resources/scanned.pdf', 'application/pdf', url='https://www.example.com/')
         self.assertTrue('Obligation to Implement All Schindler' in result)
 
     @patch('mammoth.convert_to_html')

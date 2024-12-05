@@ -117,6 +117,9 @@ def download_image(src: str, temp_directory: str) -> str:
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 '
                       'Safari/537.36'
     }
+
+    # A possible local path for the image if the html os local
+    possible_local_path = os.path.join(temp_directory, os.path.basename(src))
     # Regular expression to match data URL and extract MIME type
     data_url_pattern = re.compile(r'data:image/(?P<type>png|jpeg|gif|jpg|svg\+xml);base64,(?P<data>.*)')
     match = data_url_pattern.match(src)
@@ -145,6 +148,9 @@ def download_image(src: str, temp_directory: str) -> str:
             file.write(image_data)
 
         return local_path
+    elif os.path.exists(possible_local_path):
+            # we already have a local copy in the temporary directory
+            return possible_local_path
     elif src.startswith(('http://', 'https://')):
         try:
             logger.debug(f"Downloading image: {src}")
@@ -172,11 +178,8 @@ def download_image(src: str, temp_directory: str) -> str:
         return local_path
 
     else:
-        possible_local_path = os.path.join(temp_directory, src)
-        if os.path.exists(possible_local_path):
-            return possible_local_path
-        else:
-            logger.warning(f"Could not download image: {possible_local_path} - no idea what protocol that IS!")
+        # if we extracted the images they may be local to the temp directory
+        logger.warning(f"Could not download image: {src} - no idea what protocol that IS!")
         return ''
 
 

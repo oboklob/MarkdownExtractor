@@ -22,9 +22,10 @@ def tag_visible(element: BeautifulSoup) -> bool:
 
 
 def md_from_html(body, url=None, extract_images: bool = True, strip_non_content: bool = True,
-                 enhance_image_level: int = 2) -> str:
+                 enhance_image_level: int = 2, temp_directory: str = None) -> str:
     """
     Given an HTML document, extract the text from it, and return it as a string.
+    :param temp_directory: Optionally passed temporary directory to use for image extraction
     :param enhance_image_level:
     :param extract_images:
     :param url:
@@ -60,7 +61,7 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
 
     # extract text from any embedded images
     if extract_images:
-        convert_images_to_text(soup, enhance_level=enhance_image_level)
+        convert_images_to_text(soup, enhance_level=enhance_image_level, temp_directory=temp_directory)
         logger.debug(f"converted images to text...")
 
     texts = soup.findAll(string=True)
@@ -217,22 +218,24 @@ def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern,
             element.decompose()
             if len(soup.get_text(strip=True)) == 0:
                 # restore the soup because stripping this element removed all content
-                logger.debug(f"Restoring soup because stripping {element} removed all content")
+                logger.debug(f"Restoring soup because stripping {element.name} removed all content")
                 soup = backup_soup
 
     logger.debug(f"Decomposed to:\n{soup.get_text()}")
     return soup
 
 
-def convert_images_to_text(soup: BeautifulSoup, enhance_level=2):
+def convert_images_to_text(soup: BeautifulSoup, enhance_level=2, temp_directory: str = None) -> None:
     """
     Given a BeautifulSoup object, find all images and extract the text from them.
+    :param temp_directory:
     :param soup:
     :param enhance_level: Enhance the image before extracting the text
     :return:
     """
 
     with tempfile.TemporaryDirectory() as tempDirectory:
+        preferred_temp_directory = temp_directory or tempDirectory
         for img_tag in soup.find_all('img'):
             # Extract the src attribute
             if 'src' not in img_tag.attrs:
@@ -241,7 +244,7 @@ def convert_images_to_text(soup: BeautifulSoup, enhance_level=2):
             # Extract the alt attribute if it exists
             alt_text = img_tag.get('alt', '')
 
-            text_content = download_and_extract_image_to_md(img_tag['src'], tempDirectory, alt_text=alt_text,
+            text_content = download_and_extract_image_to_md(img_tag['src'], preferred_temp_directory, alt_text=alt_text,
                                                             enhance_level=enhance_level)
 
             if not text_content:

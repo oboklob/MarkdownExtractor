@@ -60,6 +60,10 @@ class TestmarkdownExtractor(unittest.TestCase):
         result = extract('tests/resources/test.pdf', 'application/pdf')
         self.assertTrue('Test Document' in result)
 
+    def test_extract_actual_pdf(self):
+        result = extract('tests/resources/scanned.pdf', 'application/pdf')
+        self.assertTrue('Obligation to Implement All Schindler' in result)
+
     @patch('mammoth.convert_to_html')
     def test_extract_docx(self, mock_convert_to_html):
         mock_convert_to_html.return_value = MagicMock(value='<html><body>Hello World</body></html>')

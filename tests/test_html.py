@@ -196,6 +196,48 @@ def test_md_from_html_with_large_navigation():
     assert result == 'Hello,\n[World!](http://example.com/world.html)'
 
 
+def test_divs_not_removed_for_having_near_excude_classes():
+    result = md_from_html('<html><body class="sidebar"><div class="main-sidebar"><div id="not-a-popup">Hello World!</div></div></body></html>', 'http://example.com')
+
+    assert result == 'Hello World!'
+
+def test_item_not_removed_because_empty_result():
+    result = md_from_html('<html><body class="sidebar"><div class="main-sidebar"><div role="navigation">Hello World!</div></div></body></html>', 'http://example.com')
+
+    assert result == 'Hello World!'
+
+def test_roles_removed():
+    result = md_from_html('<html><body class="sidebar"><div class="main-sidebar">Hello World!<div role="navigation"> Goodbye World!</div></div></body></html>', 'http://example.com')
+
+    assert result == 'Hello World!'
+
+def test_complex_situation():
+    result = md_from_html("""
+    <body class="page-template page-template-page-sidebar page-template-page-sidebar-php page page-id-15347" data-template="base.twig">
+        <main id="content" role="main" class="site-main">	                  
+            <div class="wrap wrap--relative background-sidebar background-sidebar--overlap">
+                <div class="grid grid--1-12--ng">
+                    <section id="modules" class="modules-content page-content grid__item grid__item--span-8 switched ">
+                        <div class="content-wrap content-wrap--right">
+                            <div class="grid grid--1-8--cm">
+                                <div class="grid__item grid__item--span-8 module-text">
+                                    <div class="modules-content__text">
+                                        <div class="wysiwyg">
+                                            <p>Hello</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>    
+                </div>
+            </div>
+        </main>
+         World!
+    </body>
+    """, 'http://example.com')
+    assert result == 'Hello\n\nWorld!'
+
 
 def test_convert_links_to_markdown_with_valid_link():
     soup = BeautifulSoup('<a href="http://example.com">Example</a>', 'html.parser')

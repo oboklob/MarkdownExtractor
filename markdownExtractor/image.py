@@ -172,7 +172,11 @@ def download_image(src: str, temp_directory: str) -> str:
         return local_path
 
     else:
-        logger.warning(f"Could not download image: {src} - no idea what protocol that IS!")
+        possible_local_path = os.path.join(temp_directory, src)
+        if os.path.exists(possible_local_path):
+            return possible_local_path
+        else:
+            logger.warning(f"Could not download image: {possible_local_path} - no idea what protocol that IS!")
         return ''
 
 

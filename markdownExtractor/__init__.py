@@ -125,15 +125,16 @@ def extract(
 
     elif filemime == 'application/pdf':
         # Convert to html then call extract
-        with tempfile.NamedTemporaryFile(mode='w+b', suffix='.html') as tmp:
-            # extract the text from the pdf
-            with open(filepath, 'rb') as file:
-                extract_text_to_fp(io.BytesIO(file.read()), tmp, output_type='html', codec='utf-8')
-            # read the text from the temporary file
-            tmp.seek(0)
-            content = get_file_content(tmp.name, 'text/html')
-            return md_from_html(content, url=url, extract_images=extract_images,
-                                strip_non_content=strip_non_content, enhance_image_level=enhance_image_level)
+        with tempfile.TemporaryDirectory() as tempDirectory:
+            with tempfile.NamedTemporaryFile(delete=False, dir=tempDirectory, suffix='.html') as tmp:
+                # extract the text from the pdf
+                with open(filepath, 'rb') as file:
+                    extract_text_to_fp(io.BytesIO(file.read()), tmp, output_type='html', codec='utf-8', output_dir=tempDirectory,)
+                # read the text from the temporary file
+                tmp.seek(0)
+                content = get_file_content(tmp.name, 'text/html')
+                return md_from_html(content, url=url, temp_directory=tempDirectory, extract_images=extract_images,
+                                    strip_non_content=strip_non_content, enhance_image_level=enhance_image_level)
 
     elif filemime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         result = mammoth.convert_to_html(filepath)

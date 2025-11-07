@@ -1,5 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
+
+import pytest
+
 from markdownExtractor import extract_from_url, get_filemime, extract
 from pdfminer.high_level import extract_text_to_fp
 
@@ -60,6 +63,7 @@ class TestmarkdownExtractor(unittest.TestCase):
         result = extract('tests/resources/test.pdf', 'application/pdf')
         self.assertTrue('Test Document' in result)
 
+    @pytest.mark.skip("Skipping scanned PDF test as it requires OCR which may not be available in all environments. Also takes too long")
     def test_extract_actual_pdf_2(self):
         result = extract('tests/resources/scanned.pdf', 'application/pdf', url='https://www.example.com/')
         self.assertTrue('Obligation to Implement All Schindler' in result)

@@ -271,8 +271,17 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
     data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT, config=custom_config)
     text = ''
 
-    for i in range(len(data['text'])):
-        if int(data['conf'][i]) > 40:  # Confidence level check
-            text += data['text'][i] + ' '
+    conf_values = data.get('conf', [])
+    text_values = data.get('text', [])
+
+    for i in range(len(text_values)):
+        conf_value = conf_values[i] if i < len(conf_values) else ''
+        try:
+            confidence = int(float(conf_value))
+        except (TypeError, ValueError):
+            continue
+
+        if confidence > 40:  # Confidence level check
+            text += text_values[i] + ' '
 
     return text.strip()

@@ -131,7 +131,9 @@ def extract(
         return md_from_html(result.value, url=url)
 
     elif filemime.startswith('image/'):
-        return extract_image_md(url, filepath, enhance_level=enhance_image_level)
+        image_path = filepath
+        src = url if url else image_path
+        return extract_image_md(src, image_path, enhance_level=enhance_image_level)
 
     elif filemime == 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
         return extract_pptx_md(filepath)

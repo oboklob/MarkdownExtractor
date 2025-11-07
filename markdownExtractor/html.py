@@ -42,9 +42,9 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
 
     # convert relative links to absolute using the base_url if we have one
     if url:
-        for link in soup.findAll('a', href=True):
+        for link in soup.find_all('a', href=True):
             link['href'] = urljoin(url, link['href'])
-        for img in soup.findAll('img', src=True):
+        for img in soup.find_all('img', src=True):
             img['src'] = urljoin(url, img['src'])
 
     logger.debug(f"converted relative links to absolute...")
@@ -64,7 +64,7 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
         convert_images_to_text(soup, enhance_level=enhance_image_level, temp_directory=temp_directory)
         logger.debug(f"converted images to text...")
 
-    texts = soup.findAll(string=True)
+    texts = soup.find_all(string=True)
     visible_texts = filter(tag_visible, texts)
     stripped = u"\n".join(t.strip() for t in visible_texts)
 

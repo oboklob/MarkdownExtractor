@@ -302,7 +302,7 @@ def test_convert_images_to_text_with_valid_image(mock_download_and_extract_image
     mock_download_and_extract_image_to_md.return_value = 'Image Text'
     soup = BeautifulSoup('<img src="http://example.com/image.jpg" alt="Example Image">', 'html.parser')
     convert_images_to_text(soup)
-    texts = soup.findAll(string=True)
+    texts = soup.find_all(string=True)
     stripped = u"\n".join(t.strip() for t in texts)
     assert stripped == 'Image Text'
 

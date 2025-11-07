@@ -94,6 +94,16 @@ class TestmarkdownExtractor(unittest.TestCase):
         mock_extract_image_md.return_value = 'Hello World'
         result = extract('test.png', 'image/png')
         self.assertEqual(result, 'Hello World')
+        mock_extract_image_md.assert_called_once_with('test.png', 'test.png', enhance_level=1)
+
+    def test_extract_actual_local_image(self):
+        result = extract('tests/resources/test.jpg', 'image/jpeg')
+        self.assertEqual(
+            result,
+            ('![](tests/resources/test.jpg "JPEG - Least compression - 85K Four score and seven years ago '
+             'our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated '
+             'to the proposition that all men are created equal.")')
+        )
 
 
     @patch('markdownExtractor.get_file_content')

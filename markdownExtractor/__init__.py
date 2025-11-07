@@ -1,25 +1,15 @@
+import io
+import logging
 import mimetypes
 import os
-import sys
-import zipfile
-import logging
-from bs4 import BeautifulSoup, Comment
-import re
-import requests
 import tempfile
-from pathlib import Path
-from urllib.parse import urljoin
-from PIL import Image, ImageEnhance, ImageFilter, UnidentifiedImageError
-import io
-import pytesseract
-import base64
-import hashlib
-import cairosvg
-from pdfminer.high_level import extract_text_to_fp
-from urllib.parse import urljoin
+
 import mammoth
+import requests
+from pdfminer.high_level import extract_text_to_fp
+
 from .html import md_from_html
-from .image import extract_image_md, download_image
+from .image import extract_image_md
 from .powerpoint import extract_pptx_md
 
 logger = logging.getLogger(__name__)

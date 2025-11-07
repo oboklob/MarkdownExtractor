@@ -4,6 +4,7 @@ from markdownExtractor.image import download_and_extract_image_to_md, extract_im
     download_image, convert_svg_to_png, extract_image_text
 import tempfile
 import unittest
+from pathlib import Path
 
 
 @patch('markdownExtractor.image.download_image')
@@ -84,12 +85,47 @@ def test_download_image_with_valid_url(mock_get):
 
 @patch('markdownExtractor.image.cairosvg.svg2png')
 @patch('markdownExtractor.image.Image.open')
-def test_convert_svg_to_png_with_valid_svg(mock_open, mock_svg2png):
+def test_convert_svg_to_png_with_local_path(mock_open, mock_svg2png):
     mock_svg2png.return_value = b'png_data'
     mock_open.return_value = 'image'
-    # get file from resources subdirectory of this package
+
     result = convert_svg_to_png('tests/resources/line_box.svg')
+
     assert result == 'image'
+    _, kwargs = mock_svg2png.call_args
+    assert 'file_obj' in kwargs
+    assert kwargs['file_obj'].name.endswith('line_box.svg')
+    assert 'url' not in kwargs
+
+
+@patch('markdownExtractor.image.cairosvg.svg2png')
+@patch('markdownExtractor.image.Image.open')
+def test_convert_svg_to_png_with_remote_url(mock_open, mock_svg2png):
+    mock_svg2png.return_value = b'png_data'
+    mock_open.return_value = 'image'
+
+    svg_url = 'https://example.com/image.svg'
+    result = convert_svg_to_png(svg_url)
+
+    assert result == 'image'
+    _, kwargs = mock_svg2png.call_args
+    assert kwargs['url'] == svg_url
+    assert 'file_obj' not in kwargs
+
+
+@patch('markdownExtractor.image.cairosvg.svg2png')
+@patch('markdownExtractor.image.Image.open')
+def test_convert_svg_to_png_with_file_uri(mock_open, mock_svg2png):
+    mock_svg2png.return_value = b'png_data'
+    mock_open.return_value = 'image'
+
+    svg_uri = Path('tests/resources/line_box.svg').resolve().as_uri()
+    result = convert_svg_to_png(svg_uri)
+
+    assert result == 'image'
+    _, kwargs = mock_svg2png.call_args
+    assert 'file_obj' in kwargs
+    assert kwargs['file_obj'].name.endswith('line_box.svg')
 
 
 @patch('markdownExtractor.image.pytesseract.image_to_data')

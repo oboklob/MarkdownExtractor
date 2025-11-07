@@ -97,3 +97,15 @@ def test_extract_image_text_with_valid_image(mock_image_to_data):
     mock_image_to_data.return_value = {'text': ['extracted', 'text'], 'conf': [100, 100]}
     result = extract_image_text('tests/resources/test.jpg')
     assert result == 'extracted text'
+
+
+@patch('markdownExtractor.image.pytesseract.image_to_data')
+def test_extract_image_text_ignores_blank_confidences(mock_image_to_data):
+    mock_image_to_data.return_value = {
+        'text': ['valid', 'ignored', 'words'],
+        'conf': ['85', ' ', '95']
+    }
+
+    result = extract_image_text('tests/resources/test.jpg')
+
+    assert result == 'valid words'

@@ -5,6 +5,13 @@ Markdown Extract is a Python package that extracts markdown from a URL regardles
 ## Installation
 
 You can install Markdown currently only from this private repository.
+OCR requires Tesseract to be installed on your system.
+```bash
+sudo apt install tesseract-ocr
+```
+Or build from sources:
+https://tesseract-ocr.github.io/tessdoc/Compiling.html
+
 
 ```bash
 pip install git+ssh://git@bitbucket.org/nameless-media/markdown-extract.git

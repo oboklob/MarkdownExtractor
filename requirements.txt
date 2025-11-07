@@ -1,15 +1,15 @@
-beautifulsoup4~=4.12.2
+beautifulsoup4~=4.14.2
 requests>=2.32.0
-Pillow~=10.1.0
+Pillow~=12.0.0
 pytesseract~=0.3.8
-cairosvg~=2.7.1
-pdfminer.six==20221105
-mammoth~=1.6.0
-numpy>=1.22.0
-opencv-python~=4.8.1.78
-pytest~=7.4.3
+cairosvg~=2.8.2
+pdfminer.six==20250506
+mammoth~=1.11.0
+numpy>=2.2.6
+opencv-python~=4.12.0.88
+pytest~=8.4.2
 pyyaml~=6.0
-python-pptx~=0.6.23
+python-pptx~=1.0.2
 
 
 

@@ -64,6 +64,12 @@ class TestmarkdownExtractor(unittest.TestCase):
         result = extract('tests/resources/scanned.pdf', 'application/pdf', url='https://www.example.com/')
         self.assertTrue('Obligation to Implement All Schindler' in result)
 
+    def test_extract_actual_pdf_3(self):
+        result = extract('tests/resources/awkward.pdf', 'application/pdf', url='https://www.example.com/')
+        import logging
+        logging.warning(result)
+        self.assertTrue('KONE must play its part' in result)
+
     @patch('mammoth.convert_to_html')
     def test_extract_docx(self, mock_convert_to_html):
         mock_convert_to_html.return_value = MagicMock(value='<html><body>Hello World</body></html>')

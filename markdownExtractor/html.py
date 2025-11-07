@@ -196,12 +196,21 @@ def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern,
         for element in elements:
             targets += soup.find_all(element, {a: unwanted_pattern})
 
+    def _normalize_attr_values(values):
+        if values is None:
+            return []
+        if isinstance(values, (list, tuple, set)):
+            return [str(value) for value in values if value is not None]
+        return [str(values)]
+
     for element in targets:
         # logger.debug(f"Found unwanted element: {element}")
         keep = False
         if keep_pattern is not None:
             for a in attr:
-                if a in element.attrs and any(keep_pattern.search(cls) for cls in element[a]):
+                if a in element.attrs and any(
+                    keep_pattern.search(cls) for cls in _normalize_attr_values(element.attrs.get(a))
+                ):
                     keep = True
 
         if keep or element.name == 'body':

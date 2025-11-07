@@ -211,10 +211,38 @@ def test_roles_removed():
 
     assert result == 'Hello World!'
 
+
+def test_primary_container_with_id_is_preserved():
+    html = (
+        '<html><body>'
+        '<div id="main" class="page-content">Primary Content</div>'
+        '<div id="navigation">Secondary</div>'
+        '</body></html>'
+    )
+
+    result = md_from_html(html, 'http://example.com')
+
+    assert 'Primary Content' in result
+    assert 'Secondary' not in result
+
+
+def test_primary_container_with_role_is_preserved():
+    html = (
+        '<html><body>'
+        '<div role="main">Main Area</div>'
+        '<div role="navigation">Links</div>'
+        '</body></html>'
+    )
+
+    result = md_from_html(html, 'http://example.com')
+
+    assert 'Main Area' in result
+    assert 'Links' not in result
+
 def test_complex_situation():
     result = md_from_html("""
     <body class="page-template page-template-page-sidebar page-template-page-sidebar-php page page-id-15347" data-template="base.twig">
-        <main id="content" role="main" class="site-main">	                  
+        <main id="content" role="main" class="site-main">
             <div class="wrap wrap--relative background-sidebar background-sidebar--overlap">
                 <div class="grid grid--1-12--ng">
                     <section id="modules" class="modules-content page-content grid__item grid__item--span-8 switched ">

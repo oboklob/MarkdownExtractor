@@ -46,7 +46,8 @@ def download_and_extract_image_to_md(
     return extract_image_md(src, local_path, alt_text, enhance_level=enhance_level, include_empty=include_empty)
 
 
-def extract_image_md(src: str, local_path: str, alt_text: str = '', enhance_level: int = 1, include_empty=False) -> str:
+def extract_image_md(src: str, local_path: str, alt_text: str = '', enhance_level: int = 1, include_empty=False,
+                     text_threshold: int = 512) -> str:
     """
     Extract text from a local image and convert to markdown
     :param src:
@@ -58,6 +59,10 @@ def extract_image_md(src: str, local_path: str, alt_text: str = '', enhance_leve
     """
     # Extract text from the image
     extracted_text = extract_image_text(local_path, enhance_level=enhance_level)
+    if extracted_text and len(extracted_text) > text_threshold:
+        # don't extract the text as an image, it was likely actually scanned text
+        # return the text as just text
+        return extracted_text
 
     # form the markdown
     return _image_data_to_markdown(src, alt_text, extracted_text, include_empty=include_empty)
@@ -149,8 +154,8 @@ def download_image(src: str, temp_directory: str) -> str:
 
         return local_path
     elif os.path.exists(possible_local_path):
-            # we already have a local copy in the temporary directory
-            return possible_local_path
+        # we already have a local copy in the temporary directory
+        return possible_local_path
     elif src.startswith(('http://', 'https://')):
         try:
             logger.debug(f"Downloading image: {src}")

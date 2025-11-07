@@ -204,6 +204,17 @@ def _resolve_file_uri(uri: str) -> Path:
     return Path(url2pathname(combined_path))
 
 
+def _render_svg_file(
+    file_path: Path, output_width: int, output_height: int
+) -> bytes:
+    with file_path.open('rb') as svg_file:
+        return cairosvg.svg2png(
+            file_obj=svg_file,
+            output_width=output_width,
+            output_height=output_height,
+        )
+
+
 def convert_svg_to_png(svg_path: str, output_width: int = 1000, output_height: int = 1000) -> Image:
     """
     Convert an SVG from a URL to a PNG Image, so that we can OCR
@@ -216,16 +227,14 @@ def convert_svg_to_png(svg_path: str, output_width: int = 1000, output_height: i
 
     if os.path.isfile(svg_path):
         file_path = Path(svg_path)
-        with file_path.open('rb') as svg_file:
-            png_data = cairosvg.svg2png(file_obj=svg_file, output_width=output_width, output_height=output_height)
+        png_data = _render_svg_file(file_path, output_width, output_height)
     else:
         parsed = urlparse(svg_path)
         if parsed.scheme == 'file':
             file_path = _resolve_file_uri(svg_path)
             if not file_path.is_file():
                 raise FileNotFoundError(f"SVG file not found: {svg_path}")
-            with file_path.open('rb') as svg_file:
-                png_data = cairosvg.svg2png(file_obj=svg_file, output_width=output_width, output_height=output_height)
+            png_data = _render_svg_file(file_path, output_width, output_height)
         else:
             png_data = cairosvg.svg2png(url=svg_path, output_width=output_width, output_height=output_height)
 

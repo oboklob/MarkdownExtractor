@@ -1,8 +1,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from markdownExtractor.html import md_from_html, convert_links_to_markdown, convert_headings_to_markdown, \
-    convert_emphasis_to_markdown, convert_lists_to_markdown, strip_decoration, convert_images_to_text
+    convert_emphasis_to_markdown, convert_lists_to_markdown, strip_decoration, convert_images_to_text, tag_visible, \
+    _try_decomposing_elements
 import re
 
 
@@ -11,6 +12,17 @@ def test_md_from_html_with_valid_html(mock_soup):
     mock_soup.return_value = BeautifulSoup('<p>Hello, World!</p>', 'html.parser')
     result = md_from_html('<p>Hello, World!</p>')
     assert result == 'Hello, World!'
+
+
+def test_tag_visible_filters_comment_and_hidden_elements():
+    soup = BeautifulSoup('<style>body{}</style><div><!-- Hidden --></div><p>Visible</p>', 'html.parser')
+    hidden_text = next(soup.find('style').strings)
+    comment = soup.find_all(string=lambda text: isinstance(text, Comment))[0]
+    visible_text = soup.find('p').string
+
+    assert not tag_visible(hidden_text)
+    assert not tag_visible(comment)
+    assert tag_visible(visible_text)
 
 @patch('markdownExtractor.html.BeautifulSoup')
 def test_md_from_html_with_relative_links(mock_soup):
@@ -291,10 +303,26 @@ def test_convert_lists_to_markdown_with_valid_list():
     assert str(soup) == '* Item 1\n* Item 2\n'
 
 
+def test_convert_lists_to_markdown_with_ordered_list():
+    soup = BeautifulSoup('<ol><li>First</li><li>Second</li></ol>', 'html.parser')
+
+    convert_lists_to_markdown(soup)
+
+    assert str(soup) == '1. First\n2. Second\n'
+
+
 def test_strip_decoration_with_valid_html():
     soup = BeautifulSoup('<div><nav>Navigation</nav><main>Main Content</main></div>', 'html.parser')
     result = strip_decoration(soup)
     assert str(result) == '<div><main>Main Content</main></div>'
+
+
+def test_try_decomposing_elements_respects_keep_pattern():
+    soup = BeautifulSoup('<div class="nav main-content">Keep</div><div class="nav">Drop</div>', 'html.parser')
+    result = _try_decomposing_elements(soup, re.compile('nav'), re.compile('main'))
+
+    assert 'Keep' in result.get_text()
+    assert 'Drop' not in result.get_text()
 
 
 @patch('markdownExtractor.html.download_and_extract_image_to_md')
@@ -305,6 +333,15 @@ def test_convert_images_to_text_with_valid_image(mock_download_and_extract_image
     texts = soup.find_all(string=True)
     stripped = u"\n".join(t.strip() for t in texts)
     assert stripped == 'Image Text'
+
+
+@patch('markdownExtractor.html.download_and_extract_image_to_md')
+def test_convert_images_to_text_skips_missing_src(mock_download_and_extract_image_to_md):
+    soup = BeautifulSoup('<img alt="Example Image">', 'html.parser')
+
+    convert_images_to_text(soup)
+
+    mock_download_and_extract_image_to_md.assert_not_called()
 
 
 @patch('markdownExtractor.html.BeautifulSoup')
@@ -327,3 +364,16 @@ def test_md_from_html_with_less_agressive_strip_needed_2():
         '<html><body class="clear-nav"><form><ul class="nav"><li>This is a nav item</li></ul><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></form></body></html>',
         url='http://example.com')
     assert result == 'Hello,\n[World!](http://example.com/world.html)'
+
+
+def test_try_decomposing_elements_handles_none_attributes():
+    soup = BeautifulSoup('<div id="nav">Remove me</div><main>Keep</main>', 'html.parser')
+    soup.find('div')['class'] = None
+
+    unwanted_pattern = re.compile(r'nav', re.I)
+    keep_pattern = re.compile(r'main', re.I)
+
+    result = _try_decomposing_elements(soup, unwanted_pattern, keep_pattern, ['id', 'class'])
+
+    assert 'Remove me' not in result.get_text()
+    assert 'Keep' in result.get_text()

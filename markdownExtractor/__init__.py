@@ -102,7 +102,7 @@ def extract(
     """
 
     if not filemime:
-        filemime = _normalize_mime_type(get_filemime(filepath))
+        filemime = get_filemime(filepath)
 
     if not filemime:
         logger.error(f"Could not determine mimetype for {filepath}")

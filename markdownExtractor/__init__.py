@@ -14,6 +14,13 @@ from .powerpoint import extract_pptx_md
 
 logger = logging.getLogger(__name__)
 
+def _normalize_mime_type(filemime: str) -> str:
+    """Strip parameters (such as charset) from a MIME type string."""
+    if not filemime:
+        return filemime
+    return filemime.split(';', 1)[0].strip()
+
+
 def extract_from_url(url: str, extract_images: bool = True, strip_non_content: bool = True,
                      enhance_images: bool = True) -> str:
     """
@@ -32,7 +39,7 @@ def extract_from_url(url: str, extract_images: bool = True, strip_non_content: b
         r = requests.get(url, allow_redirects=True, timeout=2)
 
         # try filemime from the headers
-        filemime = r.headers.get('content-type')
+        filemime = _normalize_mime_type(r.headers.get('content-type'))
 
         with open(filepath, 'wb') as file:
             file.write(r.content)
@@ -95,11 +102,13 @@ def extract(
     """
 
     if not filemime:
-        filemime = get_filemime(filepath)
+        filemime = _normalize_mime_type(get_filemime(filepath))
 
     if not filemime:
         logger.error(f"Could not determine mimetype for {filepath}")
         return ''
+
+    filemime = _normalize_mime_type(filemime)
 
     file_content = get_file_content(filepath, filemime)
 

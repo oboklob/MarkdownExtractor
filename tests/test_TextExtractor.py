@@ -30,6 +30,20 @@ class TestmarkdownExtractor(unittest.TestCase):
         result = extract_from_url('http://example.com')
         self.assertEqual(result, 'Hello World')
 
+    @patch('requests.get')
+    @patch('markdownExtractor.md_from_html')
+    def test_extract_html_from_url_with_charset(self, mock_md_from_html, mock_get):
+        mock_response = MagicMock()
+        mock_response.headers = {'content-type': 'text/html; charset=utf-8'}
+        mock_response.content = b'<html><body><h1>Hello World</h1></body></html>'
+        mock_get.return_value = mock_response
+        mock_md_from_html.return_value = 'Hello World'
+
+        result = extract_from_url('http://example.com')
+
+        self.assertEqual(result, 'Hello World')
+        mock_md_from_html.assert_called_once()
+
     def test_get_filemime(self):
         result = get_filemime('tests/resources/test.html')
         self.assertEqual(result, 'text/html')

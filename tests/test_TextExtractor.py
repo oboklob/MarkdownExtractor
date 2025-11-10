@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from markdownExtractor import extract_from_url, get_filemime, extract
+from markdownExtractor import extract_from_url, get_filemime, extract, _normalize_mime_type
+from markdownExtractor.powerpoint import extract_pptx_md
 from pdfminer.high_level import extract_text_to_fp
 
 def html_extract_side_effect(html):
@@ -20,6 +21,38 @@ def html_extract_side_effect(html):
 
 
 class TestmarkdownExtractor(unittest.TestCase):
+
+    def test_normalize_mime_type_handles_empty(self):
+        self.assertIsNone(_normalize_mime_type(None))
+        self.assertEqual(_normalize_mime_type(''), '')
+
+    @patch('markdownExtractor.get_filemime', return_value=None)
+    def test_extract_returns_empty_when_mime_unknown(self, mock_get_filemime):
+        result = extract('tests/resources/test.html')
+        self.assertEqual(result, '')
+        mock_get_filemime.assert_called_once_with('tests/resources/test.html')
+
+    @patch('markdownExtractor.extract_image_md', return_value='image text')
+    @patch('markdownExtractor.get_file_content', return_value='<html></html>')
+    @patch('markdownExtractor.md_from_html', return_value='')
+    def test_extract_retries_with_alternate_mimetype(self, mock_md_from_html, mock_get_file_content,
+                                                     mock_extract_image_md):
+        with patch('markdownExtractor.get_filemime', side_effect=['text/html', 'image/png']):
+            result = extract('tests/resources/test.html')
+
+        self.assertEqual(result, 'image text')
+        mock_extract_image_md.assert_called_once_with('tests/resources/test.html', 'tests/resources/test.html',
+                                                      enhance_level=1)
+        mock_get_file_content.assert_called()
+
+    @patch('markdownExtractor.get_file_content', return_value='<html></html>')
+    @patch('markdownExtractor.md_from_html', return_value='')
+    def test_extract_logs_failure_when_no_text_found(self, mock_md_from_html, mock_get_file_content):
+        with patch('markdownExtractor.get_filemime', return_value='text/html'):
+            result = extract('tests/resources/test.html')
+
+        self.assertEqual(result, '')
+        mock_get_file_content.assert_called_once()
 
     @patch('requests.get')
     @patch('markdownExtractor.extract')
@@ -129,6 +162,34 @@ class TestmarkdownExtractor(unittest.TestCase):
         mock_get_file_content.return_value = b'<html><body><h1>Hello World</h1></body></html>'
         result = extract('test.txt', 'text/plain')
         self.assertEqual(result, '')
+
+
+@patch('markdownExtractor.powerpoint.Presentation')
+@patch('markdownExtractor.powerpoint.Pt', return_value=24)
+def test_extract_pptx_md_marks_large_text_as_heading(mock_pt, mock_presentation):
+    run = MagicMock()
+    font = MagicMock()
+    font.bold = False
+    font.italic = False
+    font.underline = False
+    font.size = 30
+    run.font = font
+    run.text = 'Heading'
+    run.hyperlink = MagicMock(address=None)
+    paragraph = MagicMock()
+    paragraph.runs = [run]
+    shape = MagicMock()
+    shape.has_text_frame = True
+    text_frame = MagicMock()
+    text_frame.paragraphs = [paragraph]
+    shape.text_frame = text_frame
+    slide = MagicMock()
+    slide.shapes = [shape]
+    mock_presentation.return_value.slides = [slide]
+
+    result = extract_pptx_md('dummy.pptx')
+
+    assert result == '# Heading'
 
 
 if __name__ == '__main__':

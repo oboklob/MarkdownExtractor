@@ -3,3 +3,4 @@ tests/log/*.log
 temp_directory/
 .idea/*
 */__pycache__/*
+.coverage

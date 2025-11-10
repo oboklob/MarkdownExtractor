@@ -75,6 +75,12 @@ def test_image_data_to_markdown_with_empty_alt_text_and_extracted_text():
     assert result == ''
 
 
+def test_image_data_to_markdown_data_uri_with_alt_text_only():
+    data_uri = 'data:image/png;base64,abc'
+    result = _image_data_to_markdown(data_uri, 'Example alt', '', False)
+    assert result == '![Example alt](local.img)'
+
+
 @patch('markdownExtractor.image.requests.get')
 def test_download_image_with_valid_url(mock_get):
     mock_get.return_value.content = b'image_content'

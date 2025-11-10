@@ -364,3 +364,16 @@ def test_md_from_html_with_less_agressive_strip_needed_2():
         '<html><body class="clear-nav"><form><ul class="nav"><li>This is a nav item</li></ul><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></form></body></html>',
         url='http://example.com')
     assert result == 'Hello,\n[World!](http://example.com/world.html)'
+
+
+def test_try_decomposing_elements_handles_none_attributes():
+    soup = BeautifulSoup('<div id="nav">Remove me</div><main>Keep</main>', 'html.parser')
+    soup.find('div')['class'] = None
+
+    unwanted_pattern = re.compile(r'nav', re.I)
+    keep_pattern = re.compile(r'main', re.I)
+
+    result = _try_decomposing_elements(soup, unwanted_pattern, keep_pattern, ['id', 'class'])
+
+    assert 'Remove me' not in result.get_text()
+    assert 'Keep' in result.get_text()

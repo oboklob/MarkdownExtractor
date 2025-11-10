@@ -200,6 +200,29 @@ def test_download_image_handles_request_exception(mock_get, tmp_path):
     assert result == ''
 
 
+def test_download_image_with_data_url_unknown_type(tmp_path, monkeypatch):
+    payload = base64.b64encode(b'image-bytes').decode('ascii')
+
+    class FakeMatch:
+        def group(self, name):
+            if name == 'type':
+                return 'webp'
+            if name == 'data':
+                return payload
+            raise KeyError(name)
+
+    class FakePattern:
+        def match(self, _):
+            return FakeMatch()
+
+    monkeypatch.setattr('markdownExtractor.image.re.compile', lambda pattern: FakePattern())
+
+    result = download_image(f'data:image/webp;base64,{payload}', tmp_path.as_posix())
+
+    assert result.endswith('.img')
+    assert Path(result).is_file()
+
+
 @patch('markdownExtractor.image.requests.get')
 def test_download_image_without_extension_uses_default(mock_get, tmp_path):
     class DummyResponse:

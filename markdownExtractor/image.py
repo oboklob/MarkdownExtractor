@@ -93,6 +93,8 @@ def _image_data_to_markdown(src, alt_text, extracted_text, include_empty=False) 
         if extracted_text:
             extracted_text = extracted_text.replace('"', "'")
             text_content = f"![{alt_text}](local.img \"{extracted_text}\")"
+        elif alt_text or include_empty:
+            text_content = f"![{alt_text}](local.img)"
     else:
         text_content = f"![{alt_text}]({src}"
         if extracted_text:

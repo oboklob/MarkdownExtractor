@@ -238,6 +238,7 @@ def test_download_image_with_data_url_unknown_type(tmp_path, monkeypatch):
 def test_download_image_without_extension_uses_default(mock_get, tmp_path):
     class DummyResponse:
         content = b'abc'
+        headers = {'content-type': 'image/jpeg'}
 
         def raise_for_status(self):
             return None
@@ -246,7 +247,7 @@ def test_download_image_without_extension_uses_default(mock_get, tmp_path):
 
     result = download_image('https://example.com/image.', tmp_path.as_posix())
 
-    assert result.endswith('.img')
+    assert result.endswith('.jpg')
     assert Path(result).is_file()
 
 
@@ -473,3 +474,46 @@ def test_extract_image_text_high_enhance_level_with_grayscale_array(mock_open, m
 
     assert result == 'gray'
     mock_cvtcolor.assert_not_called()
+
+def test_download_image_blob_url():
+    # Lines 171-172
+    result = download_image('blob:https://example.com/uuid', 'tmp')
+    assert result == ''
+
+@patch('markdownExtractor.image.requests.get')
+def test_download_image_non_image_content_type(mock_get, tmp_path):
+    # Lines 185-186
+    class BadResponse:
+        content = b'<html></html>'
+        headers = {'content-type': 'text/html'}
+        def raise_for_status(self): pass
+    
+    mock_get.return_value = BadResponse()
+    result = download_image('https://example.com/bad.html', tmp_path.as_posix())
+    assert result == ''
+
+@patch('markdownExtractor.image.requests.get')
+def test_download_image_fallback_extension(mock_get, tmp_path):
+    # Line 206 - fallback to .img
+    class FallbackResponse:
+        content = b'binarydata'
+        headers = {'content-type': 'image/unknown'} # Pass validation, try fallback
+        def raise_for_status(self): pass
+    
+    mock_get.return_value = FallbackResponse()
+    # URL has no extension
+    result = download_image('https://example.com/data', tmp_path.as_posix())
+    assert result.endswith('.img')
+
+@patch('markdownExtractor.image.requests.get')
+def test_download_image_sanitize_weird_extension(mock_get, tmp_path):
+    # Line 206 - fallback to .img due to weird extension
+    class FallbackResponse:
+        content = b'binarydata'
+        headers = {'content-type': 'image/unknown'} 
+        def raise_for_status(self): pass
+    
+    mock_get.return_value = FallbackResponse()
+    # URL has weird extension
+    result = download_image('https://example.com/data.verylongext', tmp_path.as_posix())
+    assert result.endswith('.img')

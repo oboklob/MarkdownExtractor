@@ -12,7 +12,9 @@ import re
 import tempfile
 from pathlib import Path
 import logging
+import mimetypes
 from urllib.request import url2pathname
+
 from urllib.parse import urlparse, unquote
 
 logger = logging.getLogger(__name__)
@@ -163,32 +165,54 @@ def download_image(src: str, temp_directory: str) -> str:
             file.write(image_data)
 
         return local_path
+
+
+    elif src.startswith('blob:'):
+        logger.debug(f"Ignoring blob URL: {src}")
+        return ''
     elif os.path.exists(possible_local_path):
         # we already have a local copy in the temporary directory
         return possible_local_path
     elif src.startswith(('http://', 'https://')):
         try:
             logger.debug(f"Downloading image: {src}")
-            response = requests.get(src, headers=headers, timeout=2)
-            response.raise_for_status()  # This will raise an HTTPError if the HTTP request returned an unsuccessful
-            # status code
+            response = requests.get(src, headers=headers, timeout=5)
+            response.raise_for_status()
+            
+            # content type validation
+            content_type = response.headers.get('content-type', '').lower()
+            if not content_type.startswith('image/'):
+                logger.warning(f"Ignoring non-image URL: {src} (Content-Type: {content_type})")
+                return ''
+                
         except requests.exceptions.RequestException as e:
             logger.warning(f"Failed to retrieve image: {src}, due to: {e}")
             return ''
 
-        # Generate a file name based on the URL's hash
-        extension = os.path.basename(src).split('.')[-1].split('?')[0]
+        # Determine extension from content-type or URL
+        extension = mimetypes.guess_extension(content_type)
+        if extension:
+            extension = extension.lstrip('.')
+        
         if not extension:
+            # Fallback to URL extension
+            path = urlparse(src).path
+            extension = os.path.splitext(path)[1].lstrip('.')
+            
+        # Sanitize extension and file_name
+        if not extension or len(extension) > 4 or not extension.isalnum():
+            # If extension is missing, too long, or weird, default to 'img'
+            # (or we could default to 'jpg' depending on preference, but 'img' is existing behavior)
             extension = 'img'
 
-        file_name = hashlib.md5(src.encode()).hexdigest() + '.' + extension
+        file_name = f"{hashlib.md5(src.encode()).hexdigest()}.{extension}"
         local_path = os.path.join(temp_directory, 'images', file_name)
         logger.debug(f" ======  Saving image to: {local_path}")
         Path(local_path).parent.mkdir(parents=True, exist_ok=True)
 
         with open(local_path, 'wb') as file:
             logger.debug(f"Writing image to: {local_path}")
-            file.write(response.content)  # Write the entire content at once
+            file.write(response.content)
 
         return local_path
 

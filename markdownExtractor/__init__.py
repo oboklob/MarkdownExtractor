@@ -4,6 +4,7 @@ import mimetypes
 import os
 import tempfile
 
+import PIL.Image
 import mammoth
 import requests
 from pdfminer.high_level import extract_text_to_fp
@@ -142,6 +143,18 @@ def extract(
     elif filemime.startswith('image/'):
         image_path = filepath
         src = url if url else image_path
+
+        # Check image size and disable enhancement if too large
+        try:
+             with PIL.Image.open(image_path) as img:
+                 width, height = img.size
+                 pixels = width * height
+                 if pixels > 10_000_000:
+                     logger.warning(f"Image {image_path} is too large ({pixels} pixels). Disabling enhancement.")
+                     enhance_image_level = 0
+        except Exception as e:
+             logger.warning(f"Could not check image size: {e}")
+
         return extract_image_md(src, image_path, enhance_level=enhance_image_level)
 
     elif filemime == 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
@@ -168,6 +181,7 @@ def extract(
 
     logger.debug('extracted')
     return text
+
 
 
 """

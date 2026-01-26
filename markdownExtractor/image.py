@@ -12,8 +12,8 @@ import re
 import tempfile
 from pathlib import Path
 import logging
-from urllib.parse import urlparse
 from urllib.request import url2pathname
+from urllib.parse import urlparse, unquote
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +130,20 @@ def download_image(src: str, temp_directory: str) -> str:
     # A possible local path for the image if the html os local
     possible_local_path = os.path.join(temp_directory, os.path.basename(src))
     # Regular expression to match data URL and extract MIME type
-    data_url_pattern = re.compile(r'data:image/(?P<type>png|jpeg|gif|jpg|svg\+xml);base64,(?P<data>.*)')
+    data_url_pattern = re.compile(r'data:image/(?P<type>png|jpeg|gif|jpg|svg\+xml)(?P<encoding>;base64)?,(?P<data>.*)')
     match = data_url_pattern.match(src)
 
     if match:
         logger.debug(f"Found data URL: {src}")
-        # It's a data URL, so decode the base64 data
-        image_data = base64.b64decode(match.group('data'))
         image_type = match.group('type')
+        data_str = match.group('data')
+        encoding = match.group('encoding')
+
+        if encoding == ';base64':
+            image_data = base64.b64decode(data_str)
+        else:
+            # It's URL encoded
+            image_data = unquote(data_str).encode('utf-8')
 
         # Determine the file extension
         if image_type == 'jpeg' or image_type == 'jpg':

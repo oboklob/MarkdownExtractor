@@ -182,6 +182,15 @@ def test_download_image_with_data_url_svg(tmp_path):
     assert result.endswith('.svg')
 
 
+def test_download_image_with_data_url_svg_url_encoded(tmp_path):
+    data_url = "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%200%200'%3E%3C/svg%3E"
+
+    result = download_image(data_url, tmp_path.as_posix())
+
+    assert result.endswith('.svg')
+    assert Path(result).is_file()
+
+
 def test_download_image_with_data_url_gif(tmp_path):
     payload = base64.b64encode(b'GIF89a').decode('ascii')
     data_url = f'data:image/gif;base64,{payload}'
@@ -209,6 +218,8 @@ def test_download_image_with_data_url_unknown_type(tmp_path, monkeypatch):
                 return 'webp'
             if name == 'data':
                 return payload
+            if name == 'encoding':
+                return ';base64'
             raise KeyError(name)
 
     class FakePattern:

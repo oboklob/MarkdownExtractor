@@ -21,6 +21,14 @@ def html_extract_side_effect(html):
 
 
 class TestmarkdownExtractor(unittest.TestCase):
+    def setUp(self):
+        self.markitdown_patcher = patch('markdownExtractor.MarkItDown')
+        self.mock_markitdown = self.markitdown_patcher.start()
+        self.mock_markitdown.return_value.convert.side_effect = Exception("Mocked fallback for legacy tests")
+
+    def tearDown(self):
+        patch.stopall()
+
 
     def test_normalize_mime_type_handles_empty(self):
         self.assertIsNone(_normalize_mime_type(None))
@@ -249,6 +257,27 @@ def test_extract_pptx_md_marks_large_text_as_heading(mock_pt, mock_presentation)
 
     assert result == '# Heading'
 
+
+    def test_extract_markitdown_success(self):
+        self.mock_markitdown.return_value.convert.side_effect = None
+        mock_result = MagicMock()
+        mock_result.text_content = "Markitdown Extracted Content"
+        self.mock_markitdown.return_value.convert.return_value = mock_result
+        
+        result = extract('dummy.pdf', 'application/pdf')
+        self.assertEqual(result, "Markitdown Extracted Content")
+        
+    def test_extract_markitdown_empty_returns_fallback(self):
+        self.mock_markitdown.return_value.convert.side_effect = None
+        mock_result = MagicMock()
+        mock_result.text_content = ""
+        self.mock_markitdown.return_value.convert.return_value = mock_result
+        
+        with patch('markdownExtractor.extract_text_to_fp'):
+            with patch('markdownExtractor.md_from_html', return_value="Fallback Content"):
+                with patch('markdownExtractor.get_file_content', return_value=b'<html></html>'):
+                    result = extract('dummy.pdf', 'application/pdf')
+                    self.assertEqual(result, "Fallback Content")
 
 if __name__ == '__main__':
     unittest.main()

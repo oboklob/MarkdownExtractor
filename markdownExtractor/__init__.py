@@ -7,6 +7,7 @@ import tempfile
 import PIL.Image
 import mammoth
 import requests
+from markitdown import MarkItDown
 from pdfminer.high_level import extract_text_to_fp
 
 from .html import md_from_html
@@ -124,20 +125,33 @@ def extract(
         else:
             logger.debug(f"Got nothing from Markdown!")
 
-    elif filemime == 'text/html':
-        if url and _fetch_md:
-            try:
-                headers = {'Accept': 'text/markdown, text/html, application/xhtml+xml, */*;q=0.8'}
-                r = requests.get(url, headers=headers, allow_redirects=True, timeout=2)
-                if _normalize_mime_type(r.headers.get('content-type')) == 'text/markdown':
-                    logger.debug(f"Successfully fetched Markdown for Agents from {url}")
-                    text = r.content.decode('utf-8')
-                    if text:
-                        return text
-            except Exception as e:
-                logger.debug(f"Failed to fetch MD for Agents from {url}: {e}")
+    if filemime == 'text/html' and url and _fetch_md:
+        try:
+            headers = {'Accept': 'text/markdown, text/html, application/xhtml+xml, */*;q=0.8'}
+            r = requests.get(url, headers=headers, allow_redirects=True, timeout=2)
+            if _normalize_mime_type(r.headers.get('content-type')) == 'text/markdown':
+                logger.debug(f"Successfully fetched Markdown for Agents from {url}")
+                text = r.content.decode('utf-8')
+                if text:
+                    return text
+        except Exception as e:
+            logger.debug(f"Failed to fetch MD for Agents from {url}: {e}")
 
-        logger.debug(f"Converting HTML to Markdown...")
+    try:
+        logger.debug(f"Attempting to extract using markitdown...")
+        md = MarkItDown()
+        result = md.convert(filepath)
+        if result and result.text_content:
+            text = result.text_content.strip()
+            if text:
+                logger.debug(f"Successfully extracted with markitdown: '{text[0:100]}...'")
+                return text
+            else:
+                logger.debug("markitdown returned empty text, falling back to older methods.")
+    except Exception as e:
+        logger.debug(f"markitdown failed: {e}. Falling back to older methods.")
+
+    if filemime == 'text/html':
         text = md_from_html(file_content, url=url, extract_images=extract_images, strip_non_content=strip_non_content,
                             enhance_image_level=enhance_image_level)
         if text:

@@ -295,7 +295,7 @@ def extract_image_text(local_path: str, enhance_level: int = 1) -> str:
 
     if enhance_level > 0:
         # Resize the image
-        scale_factor = 6
+        scale_factor = 3
         new_size = (img.width * scale_factor, img.height * scale_factor)
         try:
             img = img.resize(new_size, Image.LANCZOS)

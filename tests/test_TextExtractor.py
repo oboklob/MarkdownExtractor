@@ -154,21 +154,19 @@ class TestmarkdownExtractor(unittest.TestCase):
         mock_get.assert_not_called()
 
     @patch('markdownExtractor.get_filemime')
-    @patch('markdownExtractor.html.md_from_html', html=html_extract_side_effect)
-    @patch('markdownExtractor.extract_text_to_fp')
+    @patch('markdownExtractor.extract_pdf_md')
     @patch('markdownExtractor.get_file_content')
-    def test_extract_type_fail(self, mock_get_file_content, mock_extract_text_to_fp, mock_md_from_html, mock_get_filemime):
+    def test_extract_type_fail(self, mock_get_file_content, mock_extract_pdf_md, mock_get_filemime):
         mock_get_filemime.return_value = 'text/html'
         mock_get_file_content.return_value = b'<html><body>Hello World</body></html>'
-        mock_extract_text_to_fp.return_value = ''
-        mock_md_from_html.return_value = 'Hello World'
+        mock_extract_pdf_md.return_value = 'Hello World'
         result = extract('tests/resources/test.html', 'application/pdf')
+        # Since it's a PDF route in the routing table, it will call extract_pdf_md
         self.assertEqual(result, 'Hello World')
 
-    @patch('markdownExtractor.extract_text_to_fp')
-    @patch('markdownExtractor.md_from_html')
-    def test_extract_pdf(self, mock_md_from_html, mock_extract_text_to_fp):
-        mock_md_from_html.return_value = 'Hello World'
+    @patch('markdownExtractor.extract_pdf_md')
+    def test_extract_pdf(self, mock_extract_pdf_md):
+        mock_extract_pdf_md.return_value = 'Hello World'
         result = extract('tests/resources/test.pdf', 'application/pdf')
         self.assertEqual(result, 'Hello World')
 

@@ -87,6 +87,64 @@ class TestmarkdownExtractor(unittest.TestCase):
         result = extract('tests/resources/test.html', 'text/html')
         self.assertEqual(result, 'Hello World')
 
+    @patch('markdownExtractor.get_file_content')
+    def test_extract_markdown(self, mock_get_file_content):
+        mock_get_file_content.return_value = b'# Hello World'
+        result = extract('test.md', 'text/markdown')
+        self.assertEqual(result, '# Hello World')
+
+    @patch('markdownExtractor.get_file_content')
+    @patch('markdownExtractor.get_filemime')
+    def test_extract_markdown_empty(self, mock_get_filemime, mock_get_file_content):
+        mock_get_filemime.return_value = 'text/markdown'
+        mock_get_file_content.return_value = b''
+        result = extract('test.md', 'text/markdown')
+        self.assertEqual(result, '')
+
+    @patch('markdownExtractor.requests.get')
+    @patch('markdownExtractor.get_file_content')
+    def test_extract_html_with_url_fetches_md(self, mock_get_file_content, mock_get):
+        mock_get_file_content.return_value = b'<html><body><h1>Hello World</h1></body></html>'
+        mock_response = MagicMock()
+        mock_response.headers = {'content-type': 'text/markdown'}
+        mock_response.content = b'# Hello World'
+        mock_get.return_value = mock_response
+
+        # _fetch_md is True by default
+        result = extract('tests/resources/test.html', 'text/html', url='http://example.com')
+        
+        self.assertEqual(result, '# Hello World')
+        mock_get.assert_called_once()
+
+    @patch('markdownExtractor.md_from_html')
+    @patch('markdownExtractor.requests.get')
+    @patch('markdownExtractor.get_file_content')
+    def test_extract_html_with_url_fallback_to_html(self, mock_get_file_content, mock_get, mock_md_from_html):
+        mock_get_file_content.return_value = b'<html><body><h1>Hello World</h1></body></html>'
+        mock_response = MagicMock()
+        mock_response.headers = {'content-type': 'text/html'}
+        mock_response.content = b'<html></html>'
+        mock_get.return_value = mock_response
+        mock_md_from_html.return_value = 'Fallback HTML Text'
+
+        result = extract('tests/resources/test.html', 'text/html', url='http://example.com')
+        
+        self.assertEqual(result, 'Fallback HTML Text')
+        mock_get.assert_called_once()
+        mock_md_from_html.assert_called_once()
+
+    @patch('markdownExtractor.md_from_html')
+    @patch('requests.get')
+    @patch('markdownExtractor.get_file_content')
+    def test_extract_html_with_url_no_fetch_md(self, mock_get_file_content, mock_get, mock_md_from_html):
+        mock_get_file_content.return_value = b'<html><body><h1>Hello World</h1></body></html>'
+        mock_md_from_html.return_value = 'HTML text'
+        
+        result = extract('tests/resources/test.html', 'text/html', url='http://example.com', _fetch_md=False)
+        
+        self.assertEqual(result, 'HTML text')
+        mock_get.assert_not_called()
+
     @patch('markdownExtractor.get_filemime')
     @patch('markdownExtractor.html.md_from_html', html=html_extract_side_effect)
     @patch('markdownExtractor.extract_text_to_fp')

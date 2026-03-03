@@ -37,7 +37,8 @@ def extract_from_url(url: str, extract_images: bool = True, strip_non_content: b
     with tempfile.TemporaryDirectory() as tempDirectory:
         filepath = os.path.join(tempDirectory, 'file')
         logger.debug(f"Downloading file to: {filepath}")
-        r = requests.get(url, allow_redirects=True, timeout=2)
+        headers = {'Accept': 'text/markdown, text/html, application/xhtml+xml, */*;q=0.8'}
+        r = requests.get(url, headers=headers, allow_redirects=True, timeout=2)
 
         # try filemime from the headers
         filemime = _normalize_mime_type(r.headers.get('content-type'))
@@ -49,7 +50,7 @@ def extract_from_url(url: str, extract_images: bool = True, strip_non_content: b
 
         # extract the text from the file
         text = extract(filepath, filemime=filemime, extract_images=extract_images, strip_non_content=strip_non_content,
-                       enhance_image_level=enhance_images, url=url)
+                       enhance_image_level=enhance_images, url=url, _fetch_md=False)
 
     return text
 
@@ -84,7 +85,8 @@ def extract(
         url: str = None,
         extract_images: bool = True,
         strip_non_content: bool = True,
-        enhance_image_level: int = 1
+        enhance_image_level: int = 1,
+        _fetch_md: bool = True
 ) -> str:
     """
 
@@ -113,7 +115,28 @@ def extract(
 
     file_content = get_file_content(filepath, filemime)
 
-    if filemime == 'text/html':
+    if filemime == 'text/markdown':
+        logger.debug(f"File is already Markdown...")
+        text = file_content.decode('utf-8')
+        if text:
+            logger.debug(f"Got '{text[0:100]}...'")
+            return text
+        else:
+            logger.debug(f"Got nothing from Markdown!")
+
+    elif filemime == 'text/html':
+        if url and _fetch_md:
+            try:
+                headers = {'Accept': 'text/markdown, text/html, application/xhtml+xml, */*;q=0.8'}
+                r = requests.get(url, headers=headers, allow_redirects=True, timeout=2)
+                if _normalize_mime_type(r.headers.get('content-type')) == 'text/markdown':
+                    logger.debug(f"Successfully fetched Markdown for Agents from {url}")
+                    text = r.content.decode('utf-8')
+                    if text:
+                        return text
+            except Exception as e:
+                logger.debug(f"Failed to fetch MD for Agents from {url}: {e}")
+
         logger.debug(f"Converting HTML to Markdown...")
         text = md_from_html(file_content, url=url, extract_images=extract_images, strip_non_content=strip_non_content,
                             enhance_image_level=enhance_image_level)

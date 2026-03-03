@@ -16,6 +16,19 @@ from .powerpoint import extract_pptx_md
 
 logger = logging.getLogger(__name__)
 
+EXTRACTOR_ROUTING = {
+    # Mimetypes routing to legacy first
+    #pdf
+    'application/pdf': ['legacy', 'markitdown'],
+    #powerpoint
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['legacy', 'markitdown'],
+    #html
+    'text/html': ['legacy', 'markitdown'],
+       
+    # Default routing to markitdown first
+    'default': ['markitdown', 'legacy']
+}
+
 def _normalize_mime_type(filemime: str) -> str:
     """Strip parameters (such as charset) from a MIME type string."""
     if not filemime:
@@ -137,20 +150,45 @@ def extract(
         except Exception as e:
             logger.debug(f"Failed to fetch MD for Agents from {url}: {e}")
 
-    try:
-        logger.debug(f"Attempting to extract using markitdown...")
-        md = MarkItDown()
-        result = md.convert(filepath)
-        if result and result.text_content:
-            text = result.text_content.strip()
+    routing_preference = EXTRACTOR_ROUTING.get(filemime, EXTRACTOR_ROUTING['default'])
+    
+    text = ''
+    for route in routing_preference:
+        if route == 'markitdown':
+            try:
+                logger.debug(f"Attempting to extract using markitdown...")
+                md = MarkItDown()
+                result = md.convert(filepath)
+                if result and result.text_content:
+                    text = result.text_content.strip()
+                    if text:
+                        logger.debug(f"Successfully extracted with markitdown: '{text[0:100]}...'")
+                        return text
+                    else:
+                        logger.debug("markitdown returned empty text, continuing routing.")
+            except Exception as e:
+                logger.debug(f"markitdown failed: {e}. Continuing routing.")
+        elif route == 'legacy':
+            text = _legacy_extract(filepath, filemime, url, extract_images, strip_non_content, enhance_image_level, file_content)
             if text:
-                logger.debug(f"Successfully extracted with markitdown: '{text[0:100]}...'")
                 return text
-            else:
-                logger.debug("markitdown returned empty text, falling back to older methods.")
-    except Exception as e:
-        logger.debug(f"markitdown failed: {e}. Falling back to older methods.")
 
+    if not text and not _trying_again:
+        # retry with common mimetypes in case it was incorrectly categorized
+        alt_mimetype = get_filemime(filepath)
+        if alt_mimetype != filemime:
+            logger.debug(f"Trying alternative mimetype: {alt_mimetype}")
+            text = extract(filepath, filemime=alt_mimetype, extract_images=extract_images,
+                           strip_non_content=strip_non_content, enhance_image_level=enhance_image_level,
+                           _trying_again=True)
+
+        if not text:
+            logger.error(f"Everything failed!")
+
+    logger.debug('extracted')
+    return text
+
+def _legacy_extract(filepath, filemime, url, extract_images, strip_non_content, enhance_image_level, file_content) -> str:
     if filemime == 'text/html':
         text = md_from_html(file_content, url=url, extract_images=extract_images, strip_non_content=strip_non_content,
                             enhance_image_level=enhance_image_level)
@@ -201,23 +239,9 @@ def extract(
         logger.error(f"Unsupported mimetype: {filemime}")
         return ''
 
-        # Don't trust the user to give us a valid mimetype, or file extension - so try until we get something
+    return ''
 
 
-    if not text and not _trying_again:
-        # retry with common mimetypes in case it was incorrectly categorized
-        alt_mimetype = get_filemime(filepath)
-        if alt_mimetype != filemime:
-            logger.debug(f"Trying alternative mimetype: {alt_mimetype}")
-            text = extract(filepath, filemime=alt_mimetype, extract_images=extract_images,
-                           strip_non_content=strip_non_content, enhance_image_level=enhance_image_level,
-                           _trying_again=True)
-
-        if not text:
-            logger.error(f"Everything failed!")
-
-    logger.debug('extracted')
-    return text
 
 
 

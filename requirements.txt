@@ -3,7 +3,7 @@ requests>=2.32.0
 Pillow~=12.0.0
 pytesseract~=0.3.8
 cairosvg~=2.8.2
-pdfminer.six==20250506
+pdfminer.six>=20250506
 mammoth~=1.11.0
 numpy>=2.2.6
 opencv-python-headless~=4.12.0.88
@@ -11,4 +11,4 @@ pytest~=8.4.2
 pytest-cov~=7.0.0
 pyyaml~=6.0
 python-pptx~=1.0.2
-markitdown~=0.1.5
+markitdown[all]~=0.1.5

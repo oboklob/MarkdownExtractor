@@ -4,3 +4,4 @@ temp_directory/
 .idea/*
 */__pycache__/*
 .coverage
+.venv/*

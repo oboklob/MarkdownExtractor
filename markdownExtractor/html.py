@@ -1,12 +1,14 @@
 import logging
+import trafilatura
 from bs4 import BeautifulSoup, Comment
 from .image import download_and_extract_image_to_md
 import re
 import tempfile
 from urllib.parse import urljoin
-import copy
 
 logger = logging.getLogger(__name__)
+
+MARKDOWN_IMAGE_PATTERN = re.compile(r'!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)')
 
 def tag_visible(element: BeautifulSoup) -> bool:
     """
@@ -21,6 +23,29 @@ def tag_visible(element: BeautifulSoup) -> bool:
     return True
 
 
+def _resolve_relative_urls(body, url: str = None) -> BeautifulSoup:
+    """
+    Parse body into a BeautifulSoup object, converting relative links/image srcs to absolute using url as the base
+    :param body:
+    :param url:
+    :return:
+    """
+    soup = BeautifulSoup(body, 'html.parser')
+    if url:
+        for link in soup.find_all('a', href=True):
+            link['href'] = urljoin(url, link['href'])
+        for img in soup.find_all('img', src=True):
+            img['src'] = urljoin(url, img['src'])
+    return soup
+
+
+def _collapse_whitespace(text: str) -> str:
+    # remove triple newlines or larger and triple spaces or larger (and replace with double)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r' {3,}', '  ', text)
+    return text.strip()
+
+
 def md_from_html(body, url=None, extract_images: bool = True, strip_non_content: bool = True,
                  enhance_image_level: int = 2, temp_directory: str = None) -> str:
     """
@@ -32,21 +57,71 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
     :param body:
     :param strip_non_content:
     """
-    soup = BeautifulSoup(body, 'html.parser')
     logger.debug(f"Converting HTML to Markdown...")
 
-    # strip headers/footers/navigation etc
     if strip_non_content:
-        soup = strip_decoration(soup)
-        logger.debug(f"stripped decoration...")
+        text = _md_from_html_trafilatura(body, url=url, extract_images=extract_images,
+                                         enhance_image_level=enhance_image_level, temp_directory=temp_directory)
+        if text:
+            return text
+        logger.debug(f"trafilatura found no content, falling back to full-page conversion...")
 
-    # convert relative links to absolute using the base_url if we have one
-    if url:
-        for link in soup.find_all('a', href=True):
-            link['href'] = urljoin(url, link['href'])
-        for img in soup.find_all('img', src=True):
-            img['src'] = urljoin(url, img['src'])
+    return _md_from_html_legacy(body, url=url, extract_images=extract_images,
+                                enhance_image_level=enhance_image_level, temp_directory=temp_directory)
 
+
+def _md_from_html_trafilatura(body, url=None, extract_images: bool = True, enhance_image_level: int = 2,
+                              temp_directory: str = None) -> str:
+    """
+    Extract the main content from an HTML document as markdown, using trafilatura to discard
+    boilerplate (nav/header/footer/ads/etc). Falls back to a less strict pass, and returns '' if
+    trafilatura can't find any content at all so the caller can fall back further.
+    """
+    soup = _resolve_relative_urls(body, url)
+    html_str = str(soup)
+
+    try:
+        text = trafilatura.extract(html_str, url=url, output_format='markdown', include_images=True,
+                                   include_links=True, include_comments=False)
+        if not text:
+            text = trafilatura.extract(html_str, url=url, output_format='markdown', include_images=True,
+                                       include_links=True, include_comments=False, favor_recall=True)
+    except Exception as e:
+        logger.debug(f"trafilatura extraction raised {e}")
+        text = None
+
+    if not text:
+        return ''
+
+    logger.debug(f"extracted main content with trafilatura...")
+
+    # trafilatura excludes a recognized page title from the body text - restore it as a heading.
+    # extensive=False skips htmldate's exhaustive date-guessing pass, which can otherwise take
+    # seconds on some pages for metadata (date/author) we don't even use here.
+    try:
+        title = trafilatura.extract_metadata(html_str, default_url=url, extensive=False).title
+    except Exception:
+        title = None
+    if title and title not in text:
+        text = f"# {title}\n\n{text}"
+
+    if extract_images:
+        if temp_directory:
+            text = _extract_text_from_markdown_images(text, temp_directory, enhance_image_level)
+        else:
+            with tempfile.TemporaryDirectory() as tmp_directory:
+                text = _extract_text_from_markdown_images(text, tmp_directory, enhance_image_level)
+        logger.debug(f"converted images to text...")
+
+    return _collapse_whitespace(text)
+
+
+def _md_from_html_legacy(body, url=None, extract_images: bool = True, enhance_image_level: int = 2,
+                         temp_directory: str = None) -> str:
+    """
+    Convert an entire HTML document to markdown verbatim, without any boilerplate removal.
+    """
+    soup = _resolve_relative_urls(body, url)
     logger.debug(f"converted relative links to absolute...")
 
     # Annotate hyperlinks with their href attribute
@@ -68,11 +143,24 @@ def md_from_html(body, url=None, extract_images: bool = True, strip_non_content:
     visible_texts = filter(tag_visible, texts)
     stripped = u"\n".join(t.strip() for t in visible_texts)
 
-    # remove triple newlines or larger and triple spaces or larger (and replace with double)
-    stripped = re.sub(r'\n{3,}', '\n\n', stripped)
-    stripped = re.sub(r' {3,}', '  ', stripped)
+    return _collapse_whitespace(stripped)
 
-    return stripped.strip()
+
+def _extract_text_from_markdown_images(markdown_text: str, temp_directory: str, enhance_image_level: int) -> str:
+    """
+    Given markdown text containing image references (as produced by trafilatura's include_images=True),
+    replace each image reference with OCR'd/extracted text via the existing image pipeline.
+    :param markdown_text:
+    :param temp_directory:
+    :param enhance_image_level:
+    :return:
+    """
+    def _replace(match: re.Match) -> str:
+        alt_text, src = match.group(1), match.group(2)
+        return download_and_extract_image_to_md(src, temp_directory, alt_text=alt_text,
+                                                 enhance_level=enhance_image_level)
+
+    return MARKDOWN_IMAGE_PATTERN.sub(_replace, markdown_text)
 
 
 def convert_links_to_markdown(soup: BeautifulSoup) -> None:
@@ -137,101 +225,6 @@ def convert_lists_to_markdown(soup: BeautifulSoup) -> None:
     # Remove the list tags themselves, leaving only the list items
     for list_tag in soup.find_all(['ul', 'ol']):
         list_tag.unwrap()
-
-
-def strip_decoration(original_soup: BeautifulSoup) -> BeautifulSoup:
-    """
-    Given a BeautifulSoup object, attempt to remove all elements that are not part of the main content
-    :param original_soup:
-    :return:
-    """
-
-    # Remove semantic elements, if they don't contain main content indicators
-    for tag_name in ['header', 'footer', 'nav', 'aside']:
-        for element in original_soup.find_all(tag_name):
-            element.decompose()
-    # work on a copy of the soup so that we don't modify the original yet
-    # using python's copy module to avoid the "A copy of a bs4.element.Tag is not supported" error
-    soup = copy.copy(original_soup)
-
-    for element in soup.find_all('form'):
-        element.decompose()
-
-    if not len(soup.get_text(strip=True)):
-        # un-decompose the forms and try again
-        soup = copy.copy(original_soup)
-
-    # Compile regular expression patterns
-    unwanted_class_id_pattern = re.compile(
-        r'(?<![\w-])(nav|popup|menu|footer|header|sidebar|advert|modal|form|cookie|social|share|navigation|dialog|banner|menubar|menuitem)(?![\w-])')
-
-    keep_class_id_pattern = re.compile(r'(content|page|wrapper|main)', re.IGNORECASE)  # Pattern to identify main content
-
-    soup = _try_decomposing_elements(soup, unwanted_class_id_pattern, keep_class_id_pattern, ['class', 'id', 'role'])
-
-    # harsher decomposing on unordered lists:
-
-    unwanted_ul_class_pattern = re.compile(r'(nav|menu|menubar|menuitem)')
-
-    soup = _try_decomposing_elements(soup, unwanted_ul_class_pattern, None, ['class'], ['li', 'ul'])
-
-    return soup
-
-
-def _try_decomposing_elements(soup: BeautifulSoup, unwanted_pattern: re.Pattern, keep_pattern: re.Pattern | None, attr: list = None, elements: list = None) -> BeautifulSoup:
-
-    # TODO: problem items https://tiscreport.org/statement-processing/MSAStatement/587686
-    # Find all elements where either the class or the id matches the unwanted pattern
-    elements_to_decompose = []
-
-    if attr is None:
-        attr = ['class', 'id']
-
-    if elements is None:
-        # run it once for All elements
-        elements = [True]
-
-    targets = []
-    for a in attr:
-        for element in elements:
-            targets += soup.find_all(element, {a: unwanted_pattern})
-
-    def _normalize_attr_values(values):
-        if values is None:
-            return []
-        if isinstance(values, (list, tuple, set)):
-            return [str(value) for value in values if value is not None]
-        return [str(values)]
-
-    for element in targets:
-        # logger.debug(f"Found unwanted element: {element}")
-        keep = False
-        if keep_pattern is not None:
-            for a in attr:
-                if a in element.attrs and any(
-                    keep_pattern.search(cls) for cls in _normalize_attr_values(element.attrs.get(a))
-                ):
-                    keep = True
-
-        if keep or element.name == 'body':
-            # don't remove if it's a keeper or the body tag
-            continue
-
-        elements_to_decompose.append(element)
-
-    # Decompose collected elements
-    for element in elements_to_decompose:
-        backup_soup = copy.copy(soup)
-        if element.name is not None:
-            logger.debug(f"Decomposing: {element.name} {element.attrs}")
-            element.decompose()
-            if len(soup.get_text(strip=True)) == 0:
-                # restore the soup because stripping this element removed all content
-                logger.debug(f"Restoring soup because stripping {element.name} removed all content")
-                soup = backup_soup
-
-    logger.debug(f"Decomposed to:\n{soup.get_text()}")
-    return soup
 
 
 def convert_images_to_text(soup: BeautifulSoup, enhance_level=2, temp_directory: str = None) -> None:

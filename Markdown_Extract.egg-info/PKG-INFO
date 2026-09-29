@@ -1,0 +1,28 @@
+Metadata-Version: 2.4
+Name: Markdown-Extract
+Version: 0.2.3b0
+Summary: Extract markdown from a URL regardless of what is there, useful for sending data to an LLM
+Home-page: https://bitbucket.org/nameless-media/markdown-extract
+Author: Stuart Gallemore
+Author-email: stuart@tiscreport.org
+Requires-Dist: beautifulsoup4~=4.14.2
+Requires-Dist: requests>=2.32.0
+Requires-Dist: Pillow~=12.0.0
+Requires-Dist: pytesseract~=0.3.8
+Requires-Dist: cairosvg~=2.8.2
+Requires-Dist: pdfminer.six>=20250506
+Requires-Dist: mammoth~=1.11.0
+Requires-Dist: numpy>=2.2.6
+Requires-Dist: opencv-python-headless~=4.12.0.88
+Requires-Dist: pytest~=8.4.2
+Requires-Dist: pytest-cov~=7.0.0
+Requires-Dist: pyyaml~=6.0
+Requires-Dist: python-pptx~=1.0.2
+Requires-Dist: pymupdf~=1.25.1
+Requires-Dist: markitdown[all]~=0.1.5
+Requires-Dist: trafilatura~=2.2.0
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary

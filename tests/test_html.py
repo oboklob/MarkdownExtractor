@@ -2,14 +2,11 @@ import pytest
 from unittest.mock import patch, MagicMock
 from bs4 import BeautifulSoup, Comment
 from markdownExtractor.html import md_from_html, convert_links_to_markdown, convert_headings_to_markdown, \
-    convert_emphasis_to_markdown, convert_lists_to_markdown, strip_decoration, convert_images_to_text, tag_visible, \
-    _try_decomposing_elements
-import re
+    convert_emphasis_to_markdown, convert_lists_to_markdown, convert_images_to_text, tag_visible, \
+    _extract_text_from_markdown_images
 
 
-@patch('markdownExtractor.html.BeautifulSoup')
-def test_md_from_html_with_valid_html(mock_soup):
-    mock_soup.return_value = BeautifulSoup('<p>Hello, World!</p>', 'html.parser')
+def test_md_from_html_with_valid_html():
     result = md_from_html('<p>Hello, World!</p>')
     assert result == 'Hello, World!'
 
@@ -24,13 +21,22 @@ def test_tag_visible_filters_comment_and_hidden_elements():
     assert not tag_visible(comment)
     assert tag_visible(visible_text)
 
-@patch('markdownExtractor.html.BeautifulSoup')
-def test_md_from_html_with_relative_links(mock_soup):
-    mock_soup.return_value = BeautifulSoup('<p>Hello, <a href="world.html">World!</a></p>', 'html.parser')
+def test_md_from_html_with_relative_links():
     result = md_from_html('<p>Hello, <a href="world.html">World!</a></p>', url='http://example.com')
     assert result == 'Hello,\n[World!](http://example.com/world.html)'
 
+
 def test_md_from_html_with_large_navigation():
+    """A large, realistic site-wide nav (no semantic <nav> tag, just classed divs/uls) alongside a
+    genuine article body should have the nav stripped and the article content kept. This needs a
+    real article paragraph (not a one-liner) since trafilatura's extraction needs enough body text
+    to distinguish the article from the surrounding chrome."""
+    article = (
+        'ACME Ltd is a global company dedicated to producing high quality goods for households '
+        'everywhere. This page contains our latest announcements and news updates for shareholders '
+        'and customers alike, spanning several sentences of real substantive content that should be '
+        'retained by any reasonable content extractor.'
+    )
     result = md_from_html("""<div class="wd_mobile-nav-wrapper">
     						<ul class="wd_mobile-nav">
     	<li class=""><a href="/welcome">ACME's Better Days Home</a></li>
@@ -204,56 +210,44 @@ def test_md_from_html_with_large_navigation():
     </li>
     </ul>
 
-    					</div><p>Hello, <a href="world.html">World!</a></p>""", url='http://example.com')
-    assert result == 'Hello,\n[World!](http://example.com/world.html)'
+    					</div><p>{article}</p><p>Hello, <a href="world.html">World!</a></p>""".format(article=article), url='http://example.com')
+    assert 'ACME Company Overview' not in result
+    assert 'Message from our CEO' not in result
+    assert article in result
+    assert 'Hello, [World!](http://example.com/world.html)' in result
 
 
-def test_divs_not_removed_for_having_near_excude_classes():
-    result = md_from_html('<html><body class="sidebar"><div class="main-sidebar"><div id="not-a-popup">Hello World!</div></div></body></html>', 'http://example.com')
-
-    assert result == 'Hello World!'
-
-def test_item_not_removed_because_empty_result():
-    result = md_from_html('<html><body class="sidebar"><div class="main-sidebar"><div role="navigation">Hello World!</div></div></body></html>', 'http://example.com')
-
-    assert result == 'Hello World!'
-
-def test_roles_removed():
-    result = md_from_html('<html><body class="sidebar"><div class="main-sidebar">Hello World!<div role="navigation"> Goodbye World!</div></div></body></html>', 'http://example.com')
-
-    assert result == 'Hello World!'
-
-
-def test_primary_container_with_id_is_preserved():
-    html = (
-        '<html><body>'
-        '<div id="main" class="page-content">Primary Content</div>'
-        '<div id="navigation">Secondary</div>'
-        '</body></html>'
+def test_md_from_html_does_not_include_yaml_frontmatter():
+    """Regression guard: the title-recovery lookup must not switch the main extraction call over
+    to trafilatura's with_metadata mode, which would prepend a YAML frontmatter block (title/url/
+    hostname/date/...) to every result instead of just restoring the title as a heading."""
+    article = (
+        'ACME Ltd is a global company dedicated to producing high quality goods for households '
+        'everywhere. This page contains our latest announcements and news updates for shareholders '
+        'and customers alike, spanning several sentences of real substantive content that should be '
+        'retained by any reasonable content extractor.'
     )
+    html = f'<html><head><title>ACME News</title></head><body><h1>ACME News</h1><p>{article}</p></body></html>'
 
-    result = md_from_html(html, 'http://example.com')
+    result = md_from_html(html, url='http://example.com')
 
-    assert 'Primary Content' in result
-    assert 'Secondary' not in result
+    assert not result.startswith('---')
+    assert 'hostname:' not in result
 
-
-def test_primary_container_with_role_is_preserved():
-    html = (
-        '<html><body>'
-        '<div role="main">Main Area</div>'
-        '<div role="navigation">Links</div>'
-        '</body></html>'
-    )
-
-    result = md_from_html(html, 'http://example.com')
-
-    assert 'Main Area' in result
-    assert 'Links' not in result
 
 def test_complex_situation():
-    result = md_from_html("""
+    """Deeply-nested WordPress-style wrapper divs, plus a real <nav>, around a genuine article
+    body: the nav should be stripped and the nested article content kept."""
+    article = (
+        'ACME Ltd is a global company dedicated to producing high quality goods for households '
+        'everywhere. This page contains our latest announcements and news updates for shareholders '
+        'and customers alike, spanning enough real substantive sentences to pass extraction '
+        'thresholds reliably every time we run this test.'
+    )
+    nav_links = ''.join(f'<a href="/{i}">Nav {i}</a> ' for i in range(10))
+    result = md_from_html(f"""
     <body class="page-template page-template-page-sidebar page-template-page-sidebar-php page page-id-15347" data-template="base.twig">
+        <nav class="site-nav">{nav_links}</nav>
         <main id="content" role="main" class="site-main">
             <div class="wrap wrap--relative background-sidebar background-sidebar--overlap">
                 <div class="grid grid--1-12--ng">
@@ -263,20 +257,20 @@ def test_complex_situation():
                                 <div class="grid__item grid__item--span-8 module-text">
                                     <div class="modules-content__text">
                                         <div class="wysiwyg">
-                                            <p>Hello</p>
+                                            <p>{article}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </section>    
+                    </section>
                 </div>
             </div>
         </main>
-         World!
     </body>
     """, 'http://example.com')
-    assert result == 'Hello\n\nWorld!'
+    assert article in result
+    assert 'Nav 0' not in result
 
 
 def test_convert_links_to_markdown_with_valid_link():
@@ -311,20 +305,6 @@ def test_convert_lists_to_markdown_with_ordered_list():
     assert str(soup) == '1. First\n2. Second\n'
 
 
-def test_strip_decoration_with_valid_html():
-    soup = BeautifulSoup('<div><nav>Navigation</nav><main>Main Content</main></div>', 'html.parser')
-    result = strip_decoration(soup)
-    assert str(result) == '<div><main>Main Content</main></div>'
-
-
-def test_try_decomposing_elements_respects_keep_pattern():
-    soup = BeautifulSoup('<div class="nav main-content">Keep</div><div class="nav">Drop</div>', 'html.parser')
-    result = _try_decomposing_elements(soup, re.compile('nav'), re.compile('main'))
-
-    assert 'Keep' in result.get_text()
-    assert 'Drop' not in result.get_text()
-
-
 @patch('markdownExtractor.html.download_and_extract_image_to_md')
 def test_convert_images_to_text_with_valid_image(mock_download_and_extract_image_to_md):
     mock_download_and_extract_image_to_md.return_value = 'Image Text'
@@ -344,36 +324,83 @@ def test_convert_images_to_text_skips_missing_src(mock_download_and_extract_imag
     mock_download_and_extract_image_to_md.assert_not_called()
 
 
-@patch('markdownExtractor.html.BeautifulSoup')
-def test_md_from_html_with_possible_full_removal(mock_soup):
-    mock_soup.return_value = BeautifulSoup('<html><body class="clear-nav"><p>Hello, <a href="world.html">World!</a></p></body></html>', 'html.parser')
-    result = md_from_html('<html><body class="clear-nav"><p>Hello, <a href="world.html">World!</a></p></body></html>', url='http://example.com')
-    assert result == 'Hello,\n[World!](http://example.com/world.html)'
-
-@patch('markdownExtractor.html.BeautifulSoup')
-def test_md_from_html_with_less_agressive_strip_needed(mock_soup):
-    mock_soup.return_value = BeautifulSoup(
-        '<html><body class="clear-nav"><ul class="nav"><li>This is a nav item</li></ul><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></body></html>', 'html.parser')
-    result = md_from_html(
-        '<html><body class="clear-nav"><ul class="nav"><li>This is a nav item</li></ul><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></body></html>',
-        url='http://example.com')
-    assert result == 'Hello,\n[World!](http://example.com/world.html)'
-
-def test_md_from_html_with_less_agressive_strip_needed_2():
-    result = md_from_html(
-        '<html><body class="clear-nav"><form><ul class="nav"><li>This is a nav item</li></ul><p class="not-nav">Hello, <a href="world.html" class="random">World!</a></p></form></body></html>',
-        url='http://example.com')
-    assert result == 'Hello,\n[World!](http://example.com/world.html)'
+def test_md_from_html_with_possible_full_removal():
+    """A body whose class matches a 'nav-ish' token (e.g. 'clear-nav') must not wipe out a genuine
+    article body just because of that class name."""
+    article = (
+        'ACME Ltd is a global company dedicated to producing high quality goods for households '
+        'everywhere. This page contains our latest announcements and news updates for shareholders '
+        'and customers alike, spanning several sentences of real substantive content that should be '
+        'retained by any reasonable content extractor.'
+    )
+    html = f'<html><body class="clear-nav"><p>{article}</p><p>Hello, <a href="world.html">World!</a></p></body></html>'
+    result = md_from_html(html, url='http://example.com')
+    assert article in result
+    assert 'Hello, [World!](http://example.com/world.html)' in result
 
 
-def test_try_decomposing_elements_handles_none_attributes():
-    soup = BeautifulSoup('<div id="nav">Remove me</div><main>Keep</main>', 'html.parser')
-    soup.find('div')['class'] = None
+def test_content_in_form_wrapper_survives_when_page_not_otherwise_empty():
+    """Characterization test for the strip_decoration TODO bug: real content wrapped
+    in a <form> is deleted (form removal has no per-element keep/undo check, only a
+    whole-soup emptiness check), while unrelated content elsewhere on the page keeps
+    the soup non-empty so the safety net never fires."""
+    html = (
+        '<html><body>'
+        '<form id="statement-viewer" class="report-form">'
+        '<h1>ACME Ltd Modern Slavery Statement 2024</h1>'
+        '<p>This statement sets out the steps ACME Ltd has taken to ensure '
+        'slavery and human trafficking is not taking place in our supply chains.</p>'
+        '</form>'
+        '<p>Site last updated January 2024.</p>'
+        '</body></html>'
+    )
+    result = md_from_html(html, 'http://example.com')
+    assert 'Modern Slavery Statement' in result
+    assert 'slavery and human trafficking' in result
 
-    unwanted_pattern = re.compile(r'nav', re.I)
-    keep_pattern = re.compile(r'main', re.I)
 
-    result = _try_decomposing_elements(soup, unwanted_pattern, keep_pattern, ['id', 'class'])
+def test_content_in_unwanted_class_wrapper_survives_when_page_not_otherwise_empty():
+    """Characterization test: real content wrapped in an element whose class matches
+    the 'unwanted' pattern (and has no 'keep' token) is deleted, while unrelated
+    content elsewhere on the page keeps the soup non-empty so the safety net never
+    fires."""
+    html = (
+        '<html><body>'
+        '<div class="promo social widget">'
+        '<h1>Annual Sustainability Report</h1>'
+        '<p>Full text of the report body goes here with real substantive content.</p>'
+        '</div>'
+        '<p>Cookies are used on this site.</p>'
+        '</body></html>'
+    )
+    result = md_from_html(html, 'http://example.com')
+    assert 'Sustainability Report' in result
+    assert 'real substantive content' in result
 
-    assert 'Remove me' not in result.get_text()
-    assert 'Keep' in result.get_text()
+
+@patch('markdownExtractor.html.download_and_extract_image_to_md')
+def test_extract_text_from_markdown_images_replaces_image_syntax(mock_download_and_extract_image_to_md):
+    mock_download_and_extract_image_to_md.return_value = 'Image Text'
+    markdown_text = 'Before\n\n![alt text](http://example.com/image.jpg)\n\nAfter'
+
+    result = _extract_text_from_markdown_images(markdown_text, '/tmp', enhance_image_level=2)
+
+    mock_download_and_extract_image_to_md.assert_called_once_with(
+        'http://example.com/image.jpg', '/tmp', alt_text='alt text', enhance_level=2)
+    assert result == 'Before\n\nImage Text\n\nAfter'
+
+
+@patch('trafilatura.extract')
+def test_md_from_html_falls_back_when_trafilatura_finds_nothing(mock_extract):
+    mock_extract.return_value = None
+    article = (
+        'ACME Ltd is a global company dedicated to producing high quality goods for households '
+        'everywhere. This page contains our latest announcements and news updates for shareholders '
+        'and customers alike, spanning several sentences of real substantive content that should be '
+        'retained by any reasonable content extractor.'
+    )
+    html = f'<html><body><p>{article}</p></body></html>'
+
+    result = md_from_html(html, url='http://example.com')
+
+    assert article in result

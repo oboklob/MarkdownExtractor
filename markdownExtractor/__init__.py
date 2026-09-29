@@ -205,7 +205,10 @@ def _legacy_extract(filepath, filemime, url, extract_images, strip_non_content, 
 
     elif filemime == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         result = mammoth.convert_to_html(filepath)
-        return md_from_html(result.value, url=url)
+        # mammoth's converted HTML is a plain content fragment with no nav/header/footer/ads to
+        # strip, and trafilatura's boilerplate-removal heuristics are tuned for real web pages, so
+        # skip content-extraction here to avoid false-positive stripping of legitimate document text.
+        return md_from_html(result.value, url=url, strip_non_content=False)
 
     elif filemime.startswith('image/'):
         image_path = filepath

@@ -12,6 +12,7 @@ from pdfminer.high_level import extract_text_to_fp
 
 from .html import md_from_html
 from .image import extract_image_md
+from .markitdown_converters import OcrDocxConverter, OcrPptxConverter
 from .powerpoint import extract_pptx_md
 from .pdf import extract_pdf_md
 
@@ -159,6 +160,12 @@ def extract(
             try:
                 logger.debug(f"Attempting to extract using markitdown...")
                 md = MarkItDown()
+                if extract_images:
+                    # OCR embedded images instead of leaving markitdown's default (unreadable)
+                    # base64 data-URI placeholder for docx/pptx files whose only content is a
+                    # picture.
+                    md.register_converter(OcrDocxConverter())
+                    md.register_converter(OcrPptxConverter())
                 result = md.convert(filepath)
                 if result and result.text_content:
                     text = result.text_content.strip()

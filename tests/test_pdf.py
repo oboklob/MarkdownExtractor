@@ -12,6 +12,9 @@ from markdownExtractor import pdf
 from markdownExtractor.pdf import is_garbled, extract_pdf_md
 
 REGIS = 'tests/statement_extraction_fixtures/pdf_garbled_tounicode_identity_h_regis.pdf'
+ROTATED_180 = 'tests/statement_extraction_fixtures/pdf_scanned_rotated_180_crayola.pdf'
+ROTATED_270 = 'tests/statement_extraction_fixtures/pdf_scanned_rotated_270_two_pages.pdf'
+UPRIGHT_SCAN = 'tests/statement_extraction_fixtures/pdf_scanned_no_text_layer_south_pennine_academies.pdf'
 LATIN_EXTENDED = re.compile(r'[Ā-˿]')
 
 PYMUPDF_GARBLED = 'DŽĚĞƌŶ\x03^ůĂǀĞƌǇ\x03^ƚĂƚĞŵĞŶƚ ' * 5
@@ -98,3 +101,60 @@ def test_garbled_ocr_output_is_never_returned():
     with patch('markdownExtractor.pdf.extract_image_text', return_value=PYMUPDF_GARBLED):
         assert extract_pdf_md(REGIS) == ''
 
+
+
+def _page_with_image(rotation=0, placement_rotate=0):
+    doc = fitz.open()
+    page = doc.new_page()
+    image = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 20, 10), False)
+    image.clear_with(255)
+    page.insert_image(fitz.Rect(50, 50, 250, 150), pixmap=image, rotate=placement_rotate)
+    page.set_rotation(rotation)
+    return doc, page
+
+
+@pytest.mark.parametrize('rotation, placement_rotate, upright', [
+    (0, 0, True),
+    (90, 0, False),
+    (180, 0, False),
+    (270, 0, False),
+    (0, 90, False),
+    (0, 180, False),
+])
+def test_images_upright(rotation, placement_rotate, upright):
+    doc, page = _page_with_image(rotation, placement_rotate)
+    assert pdf._images_upright(page) is upright
+    doc.close()
+
+
+def test_rotated_fixtures_are_rotated_scans():
+    for path in (ROTATED_180, ROTATED_270):
+        with fitz.open(path) as doc:
+            assert all(not page.get_text().strip() and page.get_images() and page.rotation for page in doc), path
+
+
+def test_rotated_scan_ocrs_the_rendered_page_not_the_raw_image():
+    with patch('markdownExtractor.pdf.extract_image_md') as raw_image, \
+            patch('markdownExtractor.pdf.extract_image_text', return_value='Modern Slavery Statement') as ocr:
+        result = extract_pdf_md(ROTATED_270)
+    raw_image.assert_not_called()
+    assert ocr.call_count == 2  # one rendered page each
+    assert ocr.call_args.args[1] == pdf.RENDERED_PAGE_ENHANCE_LEVEL
+    assert result == 'Modern Slavery Statement\n\nModern Slavery Statement'
+
+
+def test_upright_scan_still_ocrs_its_embedded_images():
+    with patch('markdownExtractor.pdf.extract_image_md', return_value='Scanned text') as raw_image, \
+            patch('markdownExtractor.pdf.extract_image_text') as rendered:
+        extract_pdf_md(UPRIGHT_SCAN)
+    assert raw_image.called
+    rendered.assert_not_called()
+
+
+@pytest.mark.skipif(shutil.which('tesseract') is None, reason='requires tesseract')
+@pytest.mark.parametrize('path, expected', [
+    (ROTATED_180, 'Modern Slavery Statement - 2019'),
+    (ROTATED_270, 'SLAVERY & HUMAN TRAFFICKING STATEMENT'),
+])
+def test_rotated_scans_are_read_the_right_way_up(path, expected):
+    assert expected in extract(path, 'application/pdf')

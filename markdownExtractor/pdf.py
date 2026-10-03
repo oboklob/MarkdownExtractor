@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 # statementapi kills extraction after 60s and OCR costs about 1s per page at 300 dpi
 OCR_PAGE_BUDGET = 20
 
+# A page rendered at 300 dpi is already the resolution Tesseract wants: the 3x upscale of image
+# enhancement doubled the time (8.9s against 4.3s for a scanned page) for the same text.
+RENDERED_PAGE_ENHANCE_LEVEL = 0
+
 _CID_RE = re.compile(r'\(cid:\d+\)')
 _LATIN_LETTER_RE = re.compile(r'[A-Za-zÀ-˿]')
 # BiDi characters to remove: LRM, RLM, LRE, RLE, PDF, LRO, RLO
@@ -35,8 +39,24 @@ def is_garbled(text: str) -> bool:
     return extended / len(letters) >= 0.3
 
 
+def _images_upright(page) -> bool:
+    """
+    Whether the page's embedded images appear the way they are stored. A scan is often stored
+    sideways or upside down with the page rotated for display, or placed rotated or flipped;
+    OCR of the raw image then reads rotated text and returns gibberish, so the rendered page
+    (which applies the rotation) must be OCR'd instead.
+    """
+    if page.rotation:
+        return False
+    for info in page.get_image_info():
+        a, b, c, d = info['transform'][:4]
+        if b or c or a <= 0 or d <= 0:
+            return False
+    return True
+
+
 def _ocr_page(page, enhance_level: int) -> str:
-    """Render the whole page and OCR it, which also catches vector-drawn text."""
+    """Render the whole page and OCR it, which also catches vector-drawn text and rotated scans."""
     pix = page.get_pixmap(dpi=300)
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         tmp_path = tmp.name
@@ -79,8 +99,9 @@ def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
                     logger.warning(f"Page {page_index} has a garbled text layer and OCR is disabled, dropping page")
                 continue
 
-            # An empty page might be a scan: OCR its embedded images first
-            if not garbled:
+            # An empty page might be a scan: OCR its embedded images first, unless they're stored
+            # rotated (see _images_upright), when only the rendered page reads the right way up
+            if not garbled and _images_upright(page):
                 logger.debug(f"Page {page_index} has no text, attempting image extraction/OCR")
                 found = False
                 for img in page.get_images(full=True):
@@ -111,7 +132,7 @@ def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
                 continue
             ocr_pages_used += 1
             logger.debug(f"Page {page_index} is {'garbled' if garbled else 'empty'}, OCR of rendered page")
-            ocr_text = _BIDI_CHARS.sub('', _ocr_page(page, enhance_image_level))
+            ocr_text = _BIDI_CHARS.sub('', _ocr_page(page, RENDERED_PAGE_ENHANCE_LEVEL))
             if ocr_text and not is_garbled(ocr_text):
                 md_content.append(ocr_text)
             elif garbled:

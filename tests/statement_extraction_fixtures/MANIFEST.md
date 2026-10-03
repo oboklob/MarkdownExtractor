@@ -47,6 +47,8 @@ Cloudflare proxy, so none of this was affected by the recent Cloudflare change.
 | `pdf_garbled_letter_spacing_atkinsrealis.pdf` | AtkinsRéalis UK Ltd / SNC-Lavalin (2019-2020) | Text layer present but font/kerning extraction inserts spurious spaces mid-word (e.g. "SL AVERY", "TR AFFICKING", "L AVALIN"). Classic PDF text-extraction garbling that isn't OCR-related. |
 | `pdf_large_image_heavy_annual_report_mondelez.pdf` | Mondelez UK Ltd (2020-2021) | 25-page, ~19.5MB glossy annual-report-style PDF, heavy on design/imagery relative to text. Stress test for large/complex layouts. |
 | `pdf_garbled_tounicode_identity_h_regis.pdf` | Regis Resources (Modern Slavery Statement, 6 pages) | Text layer present but decodes to gibberish (e.g. "DŽĚĞƌŶ\x03^ůĂǀĞƌǇ") because the Type0/Identity-H font subsets have a wrong ToUnicode map. Only OCR of the rendered page can read it. |
+| `pdf_scanned_rotated_180_crayola.pdf` | Binney & Smith (Europe) Ltd / Crayola (2019) | One-page scan stored upside down, with the page rotated 180° for display. OCR of the raw embedded image reads gibberish; only the rendered page reads the right way up. |
+| `pdf_scanned_rotated_270_two_pages.pdf` | NewRiver REIT plc | Two-page landscape scan stored sideways, pages rotated 270° for display. Same problem as the Crayola fixture. |
 
 ## Word / PowerPoint
 

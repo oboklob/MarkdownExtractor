@@ -4,14 +4,56 @@ import io
 import tempfile
 import os
 import re
-from .image import extract_image_md
+from .image import extract_image_md, extract_image_text
 
 logger = logging.getLogger(__name__)
 
-def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True, 
+# statementapi kills extraction after 60s and OCR costs about 1s per page at 300 dpi
+OCR_PAGE_BUDGET = 20
+
+_CID_RE = re.compile(r'\(cid:\d+\)')
+_LATIN_LETTER_RE = re.compile(r'[A-Za-zÀ-˿]')
+# BiDi characters to remove: LRM, RLM, LRE, RLE, PDF, LRO, RLO
+_BIDI_CHARS = re.compile(r'[‎‏‪‫‬‭‮]')
+
+
+def is_garbled(text: str) -> bool:
+    """
+    Detect a text layer whose fonts decoded to the wrong characters.
+    Garbled if there are at least 10 (cid:N) tokens, or if there are at least 20 Latin
+    letters (U+0041-U+02FF) and 0.3+ of them are in Latin Extended-A/B or IPA (U+0100 and above).
+    Control characters are deliberately not used: dot leaders can come out as \\x08.
+    """
+    if not text:
+        return False
+    if len(_CID_RE.findall(text)) >= 10:
+        return True
+    letters = [c for c in text if _LATIN_LETTER_RE.match(c) and c not in '×÷']
+    if len(letters) < 20:
+        return False
+    extended = sum(1 for c in letters if ord(c) >= 0x100)
+    return extended / len(letters) >= 0.3
+
+
+def _ocr_page(page, enhance_level: int) -> str:
+    """Render the whole page and OCR it, which also catches vector-drawn text."""
+    pix = page.get_pixmap(dpi=300)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        pix.save(tmp_path)
+        return (extract_image_text(tmp_path, enhance_level) or '').strip()
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
                    enhance_image_level: int = 2) -> str:
     """
-    Extract text from a PDF using PyMuPDF (fitz)
+    Extract text from a PDF using PyMuPDF (fitz).
+    Pages that are empty or have a garbled text layer are OCR'd (if extract_images is set
+    and the OCR page budget allows). Garbled text is never returned.
     :param filepath:
     :param url:
     :param extract_images:
@@ -20,46 +62,60 @@ def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
     """
     doc = fitz.open(filepath)
     md_content = []
-    
-    # BiDi characters to remove: LRM, RLM, LRE, RLE, PDF, LRO, RLO
-    bidi_chars = re.compile(r'[\u200e\u200f\u202a\u202b\u202c\u202d\u202e]')
-    
-    for page_index in range(len(doc)):
-        page = doc[page_index]
-        text = page.get_text().strip()
-        
-        # If there is meaningful text, use it
-        if text:
-            # Sanitize text to remove BiDi markers
-            text = bidi_chars.sub('', text)
-            md_content.append(text)
-        
-        # If the page has very little text and we are allowed to extract images, 
-        # assume it might be a scan and try to OCR
-        elif extract_images:
-            logger.debug(f"Page {page_index} has no text, attempting image extraction/OCR")
-            image_list = page.get_images(full=True)
-            
-            for img_index, img in enumerate(image_list):
-                xref = img[0]
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-                image_ext = base_image["ext"]
-                
-                # Save image to temp file for extraction
-                with tempfile.NamedTemporaryFile(suffix=f".{image_ext}", delete=False) as tmp_img:
-                    tmp_img.write(image_bytes)
-                    tmp_img_path = tmp_img.name
-                
-                try:
-                    # Use existing image extraction logic
-                    img_src = url if url else filepath
-                    img_md = extract_image_md(img_src, tmp_img_path, enhance_level=enhance_image_level)
-                    if img_md:
-                        md_content.append(img_md)
-                finally:
-                    if os.path.exists(tmp_img_path):
-                        os.remove(tmp_img_path)
-    
-    doc.close()
+    ocr_pages_used = 0
+
+    try:
+        for page_index in range(len(doc)):
+            page = doc[page_index]
+            text = _BIDI_CHARS.sub('', page.get_text().strip())
+
+            if text and not is_garbled(text):
+                md_content.append(text)
+                continue
+
+            garbled = bool(text)
+            if not extract_images:
+                if garbled:
+                    logger.warning(f"Page {page_index} has a garbled text layer and OCR is disabled, dropping page")
+                continue
+
+            # An empty page might be a scan: OCR its embedded images first
+            if not garbled:
+                logger.debug(f"Page {page_index} has no text, attempting image extraction/OCR")
+                found = False
+                for img in page.get_images(full=True):
+                    base_image = doc.extract_image(img[0])
+
+                    # Save image to temp file for extraction
+                    with tempfile.NamedTemporaryFile(suffix=f".{base_image['ext']}", delete=False) as tmp_img:
+                        tmp_img.write(base_image["image"])
+                        tmp_img_path = tmp_img.name
+
+                    try:
+                        # Use existing image extraction logic
+                        img_src = url if url else filepath
+                        img_md = extract_image_md(img_src, tmp_img_path, enhance_level=enhance_image_level)
+                        if img_md:
+                            md_content.append(img_md)
+                            found = True
+                    finally:
+                        if os.path.exists(tmp_img_path):
+                            os.remove(tmp_img_path)
+                if found:
+                    continue
+
+            if ocr_pages_used >= OCR_PAGE_BUDGET:
+                if garbled:
+                    logger.warning(f"Page {page_index} has a garbled text layer and the OCR page budget "
+                                   f"({OCR_PAGE_BUDGET}) is used up, dropping page")
+                continue
+            ocr_pages_used += 1
+            logger.debug(f"Page {page_index} is {'garbled' if garbled else 'empty'}, OCR of rendered page")
+            ocr_text = _BIDI_CHARS.sub('', _ocr_page(page, enhance_image_level))
+            if ocr_text and not is_garbled(ocr_text):
+                md_content.append(ocr_text)
+            elif garbled:
+                logger.warning(f"Page {page_index} has a garbled text layer and OCR gave no usable text, dropping page")
+    finally:
+        doc.close()
     return "\n\n".join(md_content)

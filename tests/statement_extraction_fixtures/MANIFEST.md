@@ -46,6 +46,7 @@ Cloudflare proxy, so none of this was affected by the recent Cloudflare change.
 | `pdf_scanned_no_text_layer_south_pennine_academies.pdf` | South Pennine Academies | Genuine scanned PDF: 2 pages, each a full-page JPEG image, zero embedded text layer (confirmed via `pdfimages`/`pdftotext`). Needs OCR. |
 | `pdf_garbled_letter_spacing_atkinsrealis.pdf` | AtkinsRéalis UK Ltd / SNC-Lavalin (2019-2020) | Text layer present but font/kerning extraction inserts spurious spaces mid-word (e.g. "SL AVERY", "TR AFFICKING", "L AVALIN"). Classic PDF text-extraction garbling that isn't OCR-related. |
 | `pdf_large_image_heavy_annual_report_mondelez.pdf` | Mondelez UK Ltd (2020-2021) | 25-page, ~19.5MB glossy annual-report-style PDF, heavy on design/imagery relative to text. Stress test for large/complex layouts. |
+| `pdf_garbled_tounicode_identity_h_regis.pdf` | Regis Resources (Modern Slavery Statement, 6 pages) | Text layer present but decodes to gibberish (e.g. "DŽĚĞƌŶ\x03^ůĂǀĞƌǇ") because the Type0/Identity-H font subsets have a wrong ToUnicode map. Only OCR of the rendered page can read it. |
 
 ## Word / PowerPoint
 

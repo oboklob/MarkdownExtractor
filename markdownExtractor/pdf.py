@@ -1,4 +1,4 @@
-import fitz
+import pymupdf
 import logging
 import io
 import tempfile
@@ -71,7 +71,7 @@ def _ocr_page(page, enhance_level: int) -> str:
 def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
                    enhance_image_level: int = 2) -> str:
     """
-    Extract text from a PDF using PyMuPDF (fitz).
+    Extract text from a PDF using PyMuPDF (pymupdf).
     Pages that are empty or have a garbled text layer are OCR'd (if extract_images is set
     and the OCR page budget allows). Garbled text is never returned.
     :param filepath:
@@ -81,7 +81,7 @@ def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
     :return:
     """
     # filetype, as the file's name can't be trusted (a PDF is sometimes saved as .html)
-    doc = fitz.open(filepath, filetype='pdf')
+    doc = pymupdf.open(filepath, filetype='pdf')
     md_content = []
     ocr_pages_used = 0
 

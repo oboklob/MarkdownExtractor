@@ -4,7 +4,7 @@ import re
 import shutil
 from unittest.mock import patch
 
-import fitz
+import pymupdf
 import pytest
 
 from markdownExtractor import extract
@@ -54,7 +54,7 @@ def _all_clean_pdfs():
 
 @pytest.mark.parametrize('path', _all_clean_pdfs())
 def test_is_garbled_false_on_existing_pdfs(path):
-    with fitz.open(path) as doc:
+    with pymupdf.open(path) as doc:
         for page in doc:
             assert not is_garbled(page.get_text()), f'{path} page {page.number}'
 
@@ -69,7 +69,7 @@ def test_clean_pdf_triggers_no_ocr():
 
 
 def test_garbled_fixture_is_detected_on_every_page():
-    with fitz.open(REGIS) as doc:
+    with pymupdf.open(REGIS) as doc:
         assert all(is_garbled(page.get_text()) for page in doc)
 
 
@@ -104,11 +104,11 @@ def test_garbled_ocr_output_is_never_returned():
 
 
 def _page_with_image(rotation=0, placement_rotate=0):
-    doc = fitz.open()
+    doc = pymupdf.open()
     page = doc.new_page()
-    image = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 20, 10), False)
+    image = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 20, 10), False)
     image.clear_with(255)
-    page.insert_image(fitz.Rect(50, 50, 250, 150), pixmap=image, rotate=placement_rotate)
+    page.insert_image(pymupdf.Rect(50, 50, 250, 150), pixmap=image, rotate=placement_rotate)
     page.set_rotation(rotation)
     return doc, page
 
@@ -129,7 +129,7 @@ def test_images_upright(rotation, placement_rotate, upright):
 
 def test_rotated_fixtures_are_rotated_scans():
     for path in (ROTATED_180, ROTATED_270):
-        with fitz.open(path) as doc:
+        with pymupdf.open(path) as doc:
             assert all(not page.get_text().strip() and page.get_images() and page.rotation for page in doc), path
 
 

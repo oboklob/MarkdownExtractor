@@ -80,7 +80,8 @@ def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
     :param enhance_image_level:
     :return:
     """
-    doc = fitz.open(filepath)
+    # filetype, as the file's name can't be trusted (a PDF is sometimes saved as .html)
+    doc = fitz.open(filepath, filetype='pdf')
     md_content = []
     ocr_pages_used = 0
 

@@ -80,6 +80,13 @@ def get_filemime(filepath: str) -> str:
     return mimetypes.guess_type(filepath)[0]
 
 
+def _is_pdf(file_content) -> bool:
+    """Whether the content is a PDF, going by the header it starts with (after any BOM or blank lines)."""
+    if not isinstance(file_content, (bytes, bytearray)):
+        return False
+    return file_content[:1024].lstrip(b'\xef\xbb\xbf \t\r\n\x00').startswith(b'%PDF-')
+
+
 def get_file_content(filepath: str, filemime: str) -> bytes:
     """
     Real simple file open
@@ -130,6 +137,11 @@ def extract(
     filemime = _normalize_mime_type(filemime)
 
     file_content = get_file_content(filepath, filemime)
+
+    if filemime != 'application/pdf' and _is_pdf(file_content):
+        # e.g. a PDF saved from a URL that was served as text/html: read as HTML it is megabytes of gibberish
+        logger.info(f"{filepath} is a PDF although its type is {filemime}, extracting it as a PDF")
+        filemime = 'application/pdf'
 
     if filemime == 'text/markdown':
         logger.debug(f"File is already Markdown...")

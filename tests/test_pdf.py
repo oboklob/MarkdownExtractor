@@ -158,3 +158,20 @@ def test_upright_scan_still_ocrs_its_embedded_images():
 ])
 def test_rotated_scans_are_read_the_right_way_up(path, expected):
     assert expected in extract(path, 'application/pdf')
+
+
+def test_pdf_saved_as_html_is_extracted_as_a_pdf(tmp_path):
+    """A PDF is sometimes saved from a URL that was served as text/html; read as HTML it is gibberish."""
+    disguised = tmp_path / 'statement.html'
+    shutil.copy('tests/resources/test.pdf', disguised)
+    result = extract(str(disguised), 'text/html')
+    assert 'Test Document' in result
+    assert '%PDF' not in result
+
+
+def test_html_is_not_mistaken_for_a_pdf():
+    from markdownExtractor import _is_pdf
+    assert _is_pdf(b'%PDF-1.4\n...')
+    assert _is_pdf(b'\xef\xbb\xbf\n%PDF-1.7\n...')
+    assert not _is_pdf(b'<html><body>About our %PDF- downloads</body></html>')
+    assert not _is_pdf('%PDF-1.4 as text')

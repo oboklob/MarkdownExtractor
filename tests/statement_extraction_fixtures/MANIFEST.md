@@ -31,6 +31,7 @@ Cloudflare proxy, so none of this was affected by the recent Cloudflare change.
 | `html_cookie_banner_heavy_nav_boilerplate_hilton.html` | Hilton Foods UK Ltd (2019-2020) | ~2MB real corporate page: large multi-level nav (177 nav/menu matches), cookie-consent banner, lots of boilerplate around a real statement. |
 | `html_cookie_banner_policy_boilerplate_chanel.html` | Chanel Ltd (2019-2020) | Heavy cookie-consent/legal boilerplate (137 "cookie" mentions) wrapping a general policies page rather than a focused statement. |
 | `html_clean_baseline_small_cookie_notice_fidessa.html` | Fidessa Group Holdings Ltd (2015-2016) | Small, clean statement page with just a simple cookie notice banner. Useful as a positive baseline. |
+| `html_onetrust_preference_centre_cats_protection.html` | Cats Protection (2021) | Saved rendered page with the OneTrust consent dialog in it and no `<main>`/`<article>`. OneTrust's preference centre is marked up as `ot-main-content`, so trafilatura returned the cookie settings ("Privacy Preference Center") instead of the statement. |
 
 ## Images (statement submitted as a raw photo/scan)
 

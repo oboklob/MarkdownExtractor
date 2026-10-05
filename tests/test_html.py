@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from bs4 import BeautifulSoup, Comment
+from markdownExtractor import html as html_module
 from markdownExtractor.html import md_from_html, convert_links_to_markdown, convert_headings_to_markdown, \
     convert_emphasis_to_markdown, convert_lists_to_markdown, convert_images_to_text, tag_visible, \
     _extract_text_from_markdown_images
@@ -404,3 +405,47 @@ def test_md_from_html_falls_back_when_trafilatura_finds_nothing(mock_extract):
     result = md_from_html(html, url='http://example.com')
 
     assert article in result
+
+CATS = 'tests/statement_extraction_fixtures/html_onetrust_preference_centre_cats_protection.html'
+
+
+def _consent_page(body_attrs='', wrapper_class='page'):
+    return f"""<html><body {body_attrs}>
+    <div class="{wrapper_class}"><h1>Modern Slavery Statement</h1>
+    <p>This statement sets out the steps Acme Widgets Ltd has taken during the financial year to ensure that
+    slavery and human trafficking are not taking place in its business or its supply chains.</p></div>
+    <div id="onetrust-consent-sdk"><div id="onetrust-pc-sdk"><div class="ot-main-content">
+    <h2>Privacy Preference Center</h2><p>You are in control of what we do with your personal data. You can choose
+    whether or not to allow certain types of cookies by selecting the different category headings.</p></div></div></div>
+    </body></html>"""
+
+
+def test_consent_dialog_is_removed_from_the_page():
+    soup = BeautifulSoup(_consent_page(), 'html.parser')
+    html_module._remove_consent_dialogs(soup)
+    assert 'Privacy Preference Center' not in soup.get_text()
+    assert 'Acme Widgets Ltd' in soup.get_text()
+
+
+def test_consent_dialog_is_left_out_by_both_conversions():
+    for strip_non_content in (True, False):
+        result = md_from_html(_consent_page(), extract_images=False, strip_non_content=strip_non_content)
+        assert 'Acme Widgets Ltd' in result
+        assert 'Privacy Preference Center' not in result
+
+
+def test_content_is_kept_when_its_wrapper_is_named_like_a_consent_dialog():
+    """A <body> or wrapper can carry a class like cookie-consent: it holds the content, so it stays."""
+    for page in (_consent_page(body_attrs='class="cookie-consent"'), _consent_page(wrapper_class='cookie-banner')):
+        soup = BeautifulSoup(page, 'html.parser')
+        html_module._remove_consent_dialogs(soup)
+        assert 'Acme Widgets Ltd' in soup.get_text()
+        assert 'Privacy Preference Center' not in soup.get_text()
+
+
+def test_onetrust_preference_centre_is_not_taken_for_the_content():
+    with open(CATS, encoding='utf-8', errors='replace') as f:
+        result = md_from_html(f.read(), url='https://www.cats.org.uk/terms/modern-slavery-act-statement',
+                              extract_images=False)
+    assert 'This statement sets out the actions that Cats Protection is taking' in result
+    assert 'Privacy Preference Center' not in result

@@ -10,6 +10,24 @@ logger = logging.getLogger(__name__)
 
 MARKDOWN_IMAGE_PATTERN = re.compile(r'!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)')
 
+# The containers that cookie consent managers inject into a page (which a saved, rendered page includes)
+CONSENT_DIALOG_SELECTORS = (
+    '#onetrust-consent-sdk', '#onetrust-banner-sdk', '#onetrust-pc-sdk', '.optanon-alert-box-wrapper',  # OneTrust
+    '#CybotCookiebotDialog', '#CybotCookiebotDialogBodyUnderlay', '#CookiebotWidget',  # Cookiebot
+    '.cky-consent-container', '.cky-modal', '.cky-preference-center',  # CookieYes
+    '#cookie-law-info-bar', '#cookie-law-info-again', '.cli-modal',  # GDPR Cookie Consent
+    '#cmplz-cookiebanner-container', '.cmplz-cookiebanner',  # Complianz
+    '#moove_gdpr_cookie_modal', '#moove_gdpr_cookie_info_bar',  # GDPR Cookie Compliance
+    '#BorlabsCookieBox', '#iubenda-cs-banner', '#didomi-host', '#usercentrics-root',
+    '.qc-cmp2-container', '#qc-cmp2-container',  # Quantcast
+    '#truste-consent-track', '#truste-consent-content', '.truste_box_overlay', '.truste_overlay',  # TrustArc
+    '.osano-cm-window', '#cookiescript_injected', '#cookiescript_injected_wrapper',
+    '.termly-styles-root', '#termly-code-snippet-support', '#hs-eu-cookie-confirmation',
+    '#coiOverlay', '#coi-banner-wrapper', '#ccc',  # Cookie Information, Civic Cookie Control
+    '.cc-window', '#cookie-notice', '.cookie-notice', '#cookieConsent', '#cookie-consent', '.cookie-consent',
+    '#cookie-banner', '.cookie-banner', '#cookiebanner',
+)
+
 def tag_visible(element: BeautifulSoup) -> bool:
     """
     Given a BeautifulSoup element, return True if it should be visible in the output, False otherwise
@@ -37,6 +55,25 @@ def _resolve_relative_urls(body, url: str = None) -> BeautifulSoup:
         for img in soup.find_all('img', src=True):
             img['src'] = urljoin(url, img['src'])
     return soup
+
+
+def _remove_consent_dialogs(soup: BeautifulSoup) -> None:
+    """
+    Remove cookie consent dialogs from the page. They are never the content, and trafilatura can
+    mistake one for it: OneTrust's preference centre is marked up as "ot-main-content", so for a
+    page with no <main> or <article> the cookie settings were returned instead of the page.
+
+    An element that holds the page's content is left alone, whatever it is called (a wrapper or
+    <body> can carry a class like "cookie-consent").
+    """
+    page_text = len(soup.get_text(strip=True))
+    for selector in CONSENT_DIALOG_SELECTORS:
+        for element in soup.select(selector):
+            if element.decomposed or element.name in ('html', 'body', 'main', 'article'):
+                continue
+            if element.find(['main', 'article']) or len(element.get_text(strip=True)) > page_text / 2:
+                continue
+            element.decompose()
 
 
 def _collapse_whitespace(text: str) -> str:
@@ -78,6 +115,7 @@ def _md_from_html_trafilatura(body, url=None, extract_images: bool = True, enhan
     trafilatura can't find any content at all so the caller can fall back further.
     """
     soup = _resolve_relative_urls(body, url)
+    _remove_consent_dialogs(soup)
     html_str = str(soup)
 
     try:
@@ -119,9 +157,11 @@ def _md_from_html_trafilatura(body, url=None, extract_images: bool = True, enhan
 def _md_from_html_legacy(body, url=None, extract_images: bool = True, enhance_image_level: int = 2,
                          temp_directory: str = None) -> str:
     """
-    Convert an entire HTML document to markdown verbatim, without any boilerplate removal.
+    Convert an entire HTML document to markdown verbatim, without any boilerplate removal
+    (other than cookie consent dialogs).
     """
     soup = _resolve_relative_urls(body, url)
+    _remove_consent_dialogs(soup)
     logger.debug(f"converted relative links to absolute...")
 
     # Annotate hyperlinks with their href attribute

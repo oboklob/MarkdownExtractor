@@ -15,6 +15,12 @@ OCR_PAGE_BUDGET = 20
 # enhancement doubled the time (8.9s against 4.3s for a scanned page) for the same text.
 RENDERED_PAGE_ENHANCE_LEVEL = 0
 
+# A page with no text layer is a scan, to be read from its embedded images, only if they cover at
+# least this share of it. A page whose text is drawn as outlines (a signed DocuSign export, say) has
+# no text layer either, and its only images may be a signature or a logo: OCR of those gives nothing
+# or a stray character, and the text was lost. Such a page is read by OCR of the rendered page.
+SCAN_IMAGE_COVERAGE = 0.5
+
 _CID_RE = re.compile(r'\(cid:\d+\)')
 _LATIN_LETTER_RE = re.compile(r'[A-Za-zÀ-˿]')
 # BiDi characters to remove: LRM, RLM, LRE, RLE, PDF, LRO, RLO
@@ -53,6 +59,18 @@ def _images_upright(page) -> bool:
         if b or c or a <= 0 or d <= 0:
             return False
     return True
+
+
+def _image_coverage(page) -> float:
+    """
+    The share of the page that its embedded images cover (see SCAN_IMAGE_COVERAGE). Overlapping
+    images are each counted, so it can be more than 1.
+    """
+    page_area = page.rect.get_area()
+    if not page_area:
+        return 0.0
+    covered = sum((pymupdf.Rect(info['bbox']) & page.rect).get_area() for info in page.get_image_info())
+    return covered / page_area
 
 
 def _ocr_page(page, enhance_level: int) -> str:
@@ -101,8 +119,9 @@ def extract_pdf_md(filepath: str, url: str = None, extract_images: bool = True,
                 continue
 
             # An empty page might be a scan: OCR its embedded images first, unless they're stored
-            # rotated (see _images_upright), when only the rendered page reads the right way up
-            if not garbled and _images_upright(page):
+            # rotated (see _images_upright), when only the rendered page reads the right way up, or
+            # they are only a small part of the page (see SCAN_IMAGE_COVERAGE), when its text is drawn
+            if not garbled and _images_upright(page) and _image_coverage(page) >= SCAN_IMAGE_COVERAGE:
                 logger.debug(f"Page {page_index} has no text, attempting image extraction/OCR")
                 found = False
                 for img in page.get_images(full=True):

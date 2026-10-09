@@ -15,6 +15,7 @@ REGIS = 'tests/statement_extraction_fixtures/pdf_garbled_tounicode_identity_h_re
 ROTATED_180 = 'tests/statement_extraction_fixtures/pdf_scanned_rotated_180_crayola.pdf'
 ROTATED_270 = 'tests/statement_extraction_fixtures/pdf_scanned_rotated_270_two_pages.pdf'
 UPRIGHT_SCAN = 'tests/statement_extraction_fixtures/pdf_scanned_no_text_layer_south_pennine_academies.pdf'
+OUTLINED_TEXT = 'tests/statement_extraction_fixtures/pdf_outlined_text_small_signature_images_vmed_o2_holdco_3.pdf'
 LATIN_EXTENDED = re.compile(r'[Ā-˿]')
 
 PYMUPDF_GARBLED = 'DŽĚĞƌŶ\x03^ůĂǀĞƌǇ\x03^ƚĂƚĞŵĞŶƚ ' * 5
@@ -149,6 +150,52 @@ def test_upright_scan_still_ocrs_its_embedded_images():
         extract_pdf_md(UPRIGHT_SCAN)
     assert raw_image.called
     rendered.assert_not_called()
+
+
+@pytest.mark.parametrize('image_rect, is_a_scan', [
+    (pymupdf.Rect(50, 50, 250, 150), False),  # a signature or a logo
+    (pymupdf.Rect(0, 0, 595, 842), True),     # the whole page
+    (pymupdf.Rect(0, 0, 595, 500), True),     # most of it
+])
+def test_image_coverage_tells_a_scan_from_a_page_with_a_small_image(image_rect, is_a_scan):
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    image = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 20, 10), False)
+    image.clear_with(255)
+    page.insert_image(image_rect, pixmap=image, keep_proportion=False)
+    assert (pdf._image_coverage(page) >= pdf.SCAN_IMAGE_COVERAGE) is is_a_scan
+    doc.close()
+
+
+def test_image_coverage_of_a_page_without_images_is_nothing():
+    doc = pymupdf.open()
+    assert pdf._image_coverage(doc.new_page()) == 0
+    doc.close()
+
+
+def test_outlined_text_fixture_has_no_text_layer_and_only_small_images():
+    with pymupdf.open(OUTLINED_TEXT) as doc:
+        page = doc[0]
+        assert not page.get_text().strip() and page.get_images() and pdf._images_upright(page)
+        assert pdf._image_coverage(page) < 0.05
+
+
+def test_page_of_outlined_text_ocrs_the_rendered_page_not_its_signature_images():
+    """OCR of the signature gave a stray character, which was taken for the page's text."""
+    with patch('markdownExtractor.pdf.extract_image_md', return_value='![](doc.pdf ")")') as raw_image, \
+            patch('markdownExtractor.pdf.extract_image_text', return_value='Section 172 Statement') as ocr:
+        result = extract_pdf_md(OUTLINED_TEXT)
+    raw_image.assert_not_called()
+    assert ocr.call_count == 1
+    assert result == 'Section 172 Statement'
+
+
+@pytest.mark.skipif(shutil.which('tesseract') is None, reason='requires tesseract')
+def test_outlined_text_is_read():
+    text = extract(OUTLINED_TEXT, 'application/pdf')
+    assert 'Section 172 Statement' in text
+    assert 'section 172 of the Companies Act 2006' in text
+    assert len(text.split()) > 300
 
 
 @pytest.mark.skipif(shutil.which('tesseract') is None, reason='requires tesseract')

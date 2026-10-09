@@ -50,6 +50,7 @@ Cloudflare proxy, so none of this was affected by the recent Cloudflare change.
 | `pdf_garbled_tounicode_identity_h_regis.pdf` | Regis Resources (Modern Slavery Statement, 6 pages) | Text layer present but decodes to gibberish (e.g. "DŽĚĞƌŶ\x03^ůĂǀĞƌǇ") because the Type0/Identity-H font subsets have a wrong ToUnicode map. Only OCR of the rendered page can read it. |
 | `pdf_scanned_rotated_180_crayola.pdf` | Binney & Smith (Europe) Ltd / Crayola (2019) | One-page scan stored upside down, with the page rotated 180° for display. OCR of the raw embedded image reads gibberish; only the rendered page reads the right way up. |
 | `pdf_scanned_rotated_270_two_pages.pdf` | NewRiver REIT plc | Two-page landscape scan stored sideways, pages rotated 270° for display. Same problem as the Crayola fixture. |
+| `pdf_outlined_text_small_signature_images_vmed_o2_holdco_3.pdf` | VMED O2 UK Holdco 3 Limited (Section 172 statement, 2025; from news.virginmediao2.co.uk, not the CDN) | One page signed through DocuSign: the text is drawn as outlines, so there is no text layer, and the only embedded images are three strips of a signature covering 1% of the page. OCR of those images gives a stray character; only OCR of the rendered page reads the statement. |
 
 ## Word / PowerPoint
 
